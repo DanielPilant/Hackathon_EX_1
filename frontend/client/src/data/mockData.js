@@ -56,3 +56,52 @@ export const MOCK_TEST_RESULTS = [
     timestamp: "-",
   },
 ];
+
+export const MOCK_FULL_SCAN_RESULTS = [
+  {
+    id: 101,
+    stepName: "Crawl Site Map",
+    action: "crawl",
+    selector: "sitemap.xml",
+    status: "pass",
+    duration: "2.1s",
+    timestamp: "10:50:01 AM",
+  },
+  {
+    id: 102,
+    stepName: "Check Broken Links",
+    action: "scan",
+    selector: "a[href]",
+    status: "fail",
+    duration: "4.5s",
+    timestamp: "10:50:05 AM",
+    errorMessage: "Found 3 broken links (404) on Homepage",
+  },
+  {
+    id: 103,
+    stepName: "Validate Accessibility (A11y)",
+    action: "audit",
+    selector: "document",
+    status: "pass",
+    duration: "1.8s",
+    timestamp: "10:50:07 AM",
+  },
+  {
+    id: 104,
+    stepName: "Check Console Errors",
+    action: "monitor",
+    selector: "window.console",
+    status: "pass",
+    duration: "0.5s",
+    timestamp: "10:50:08 AM",
+  },
+  {
+    id: 105,
+    stepName: "Mobile Responsiveness",
+    action: "viewport",
+    selector: "375x812",
+    status: "running",
+    duration: "...",
+    timestamp: "-",
+  },
+];

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Play,
   Activity,
@@ -8,41 +8,91 @@ import {
   Globe,
   MessageSquare,
   AlertCircle,
+  Zap,
 } from "lucide-react";
 import { apiService } from "./services/api";
 import clsx from "clsx";
 
 function App() {
+  const [userId, setUserId] = useState("");
   const [targetUrl, setTargetUrl] = useState("");
   const [userPrompt, setUserPrompt] = useState("");
   const [testResults, setTestResults] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentStatus, setCurrentStatus] = useState("idle"); // 'idle', 'connecting', 'processing'
+
+  const [isScanning, setIsScanning] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isRunningTest, setIsRunningTest] = useState(false);
+  const [isFullScanning, setIsFullScanning] = useState(false);
+
+  // Generate Session ID on mount
+  useEffect(() => {
+    const newUserId = `user_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
+    setUserId(newUserId);
+    console.log("Session ID:", newUserId);
+  }, []);
+
+  const handleConnect = async () => {
+    if (!targetUrl) return;
+    setIsScanning(true);
+    try {
+      await apiService.setTargetUrl(targetUrl, userId);
+      setIsConnected(true);
+    } catch (error) {
+      console.error("Connection failed:", error);
+    } finally {
+      setIsScanning(false);
+    }
+  };
 
   const handleRunTest = async () => {
-    if (!targetUrl || !userPrompt) return;
+    if (!userPrompt || !isConnected) return;
 
-    setIsLoading(true);
-    setTestResults([]); // Clear previous results
+    setIsRunningTest(true);
+    // setTestResults([]); // Don't clear previous results
 
     try {
-      // Step 1: Set Target URL
-      setCurrentStatus("connecting");
-      await apiService.setTargetUrl(targetUrl);
-
-      // Step 2: Send Prompt & Get Results
-      setCurrentStatus("processing");
-      const response = await apiService.sendPrompt(userPrompt);
+      const response = await apiService.runTestPrompt(userPrompt, userId);
 
       if (response.status === "completed") {
-        setTestResults(response.results);
+        const newRun = {
+          id: Date.now(),
+          title: response.title || "Untitled Test Run",
+          timestamp: new Date().toLocaleString(),
+          steps: response.results,
+        };
+        setTestResults((prev) => [newRun, ...prev]);
       }
     } catch (error) {
       console.error("Test execution failed:", error);
-      // Ideally show an error toast here
     } finally {
-      setIsLoading(false);
-      setCurrentStatus("idle");
+      setIsRunningTest(false);
+    }
+  };
+
+  const handleFullScan = async () => {
+    if (!isConnected) return;
+
+    setIsFullScanning(true);
+    // setTestResults([]); // Don't clear previous results
+
+    try {
+      const response = await apiService.runFullSiteScan(userId);
+
+      if (response.status === "completed") {
+        const newRun = {
+          id: Date.now(),
+          title: response.title || "Full Site Scan",
+          timestamp: new Date().toLocaleString(),
+          steps: response.results,
+        };
+        setTestResults((prev) => [newRun, ...prev]);
+      }
+    } catch (error) {
+      console.error("Full scan failed:", error);
+    } finally {
+      setIsFullScanning(false);
     }
   };
 
@@ -59,6 +109,10 @@ function App() {
             <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
             System Connected
           </div>
+          <div className="mt-4 text-xs text-gray-500">
+            Session ID:{" "}
+            <span className="font-mono text-gray-400">{userId}</span>
+          </div>
         </div>
         <div className="p-4 text-xs text-gray-500 text-center">
           v0.1.0 Alpha
@@ -69,19 +123,53 @@ function App() {
       <main className="flex-1 flex overflow-hidden">
         {/* Input Zone (Left Panel) */}
         <div className="w-1/3 p-6 border-r border-gray-700 flex flex-col gap-6 bg-gray-900/50">
+          {/* URL Section */}
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
               <Globe className="w-4 h-4" /> Target Website URL
             </label>
-            <input
-              type="text"
-              value={targetUrl}
-              onChange={(e) => setTargetUrl(e.target.value)}
-              placeholder="https://example.com"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={targetUrl}
+                onChange={(e) => setTargetUrl(e.target.value)}
+                disabled={isConnected || isScanning}
+                placeholder="https://example.com"
+                className={clsx(
+                  "flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all",
+                  (isConnected || isScanning) && "opacity-50 cursor-not-allowed"
+                )}
+              />
+              <button
+                onClick={handleConnect}
+                disabled={isConnected || isScanning || !targetUrl}
+                className={clsx(
+                  "px-4 rounded-lg font-bold text-sm flex items-center justify-center transition-all",
+                  isConnected
+                    ? "bg-green-600 text-white cursor-default"
+                    : "bg-blue-600 hover:bg-blue-500 text-white",
+                  (isScanning || !targetUrl) &&
+                    !isConnected &&
+                    "opacity-50 cursor-not-allowed"
+                )}
+              >
+                {isConnected ? (
+                  <CheckCircle className="w-5 h-5" />
+                ) : isScanning ? (
+                  <Activity className="w-5 h-5 animate-spin" />
+                ) : (
+                  "Scan"
+                )}
+              </button>
+            </div>
+            {isConnected && (
+              <div className="mt-2 text-xs text-green-400 flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" /> Connected to Brain
+              </div>
+            )}
           </div>
 
+          {/* Prompt Section */}
           <div className="flex-1 flex flex-col">
             <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
               <MessageSquare className="w-4 h-4" /> Test Instructions
@@ -89,34 +177,74 @@ function App() {
             <textarea
               value={userPrompt}
               onChange={(e) => setUserPrompt(e.target.value)}
-              placeholder="Describe your test case (e.g., 'Go to login page, enter valid credentials, and verify dashboard loads')..."
-              className="w-full flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none transition-all"
+              disabled={!isConnected}
+              placeholder={
+                isConnected
+                  ? "Describe your test case..."
+                  : "Please connect to a URL first."
+              }
+              className={clsx(
+                "w-full flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none transition-all",
+                !isConnected && "opacity-50 cursor-not-allowed"
+              )}
             />
           </div>
 
-          <button
-            onClick={handleRunTest}
-            disabled={isLoading || !targetUrl || !userPrompt}
-            className={clsx(
-              "w-full py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 transition-all",
-              isLoading || !targetUrl || !userPrompt
-                ? "bg-gray-700 text-gray-400 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20"
-            )}
-          >
-            {isLoading ? (
-              <>
-                <Activity className="w-5 h-5 animate-spin" />
-                {currentStatus === "connecting"
-                  ? "Connecting..."
-                  : "Processing Prompt..."}
-              </>
-            ) : (
-              <>
-                <Play className="w-5 h-5" /> Run Test
-              </>
-            )}
-          </button>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={handleRunTest}
+              disabled={
+                isRunningTest || isFullScanning || !isConnected || !userPrompt
+              }
+              className={clsx(
+                "w-full py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 transition-all",
+                isRunningTest || isFullScanning || !isConnected || !userPrompt
+                  ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                  : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20"
+              )}
+            >
+              {isRunningTest ? (
+                <>
+                  <Activity className="w-5 h-5 animate-spin" /> Processing
+                  Prompt...
+                </>
+              ) : (
+                <>
+                  <Play className="w-5 h-5" /> Run Autonomous Test
+                </>
+              )}
+            </button>
+
+            <div className="relative flex py-1 items-center">
+              <div className="flex-grow border-t border-gray-700"></div>
+              <span className="flex-shrink-0 mx-4 text-gray-500 text-xs uppercase tracking-wider">
+                Or
+              </span>
+              <div className="flex-grow border-t border-gray-700"></div>
+            </div>
+
+            <button
+              onClick={handleFullScan}
+              disabled={isRunningTest || isFullScanning || !isConnected}
+              className={clsx(
+                "w-full py-3 rounded-lg font-bold text-md flex items-center justify-center gap-2 transition-all border border-purple-500/30",
+                isRunningTest || isFullScanning || !isConnected
+                  ? "bg-gray-800 text-gray-500 cursor-not-allowed"
+                  : "bg-purple-900/20 hover:bg-purple-900/40 text-purple-300 hover:text-purple-200"
+              )}
+            >
+              {isFullScanning ? (
+                <>
+                  <Activity className="w-5 h-5 animate-spin" /> Scanning Entire
+                  Site...
+                </>
+              ) : (
+                <>
+                  <Zap className="w-5 h-5" /> Run Full Site QA Scan
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Right Panel */}
@@ -146,67 +274,87 @@ function App() {
               <CheckCircle className="w-4 h-4" /> Test Results
             </h2>
 
-            {testResults.length === 0 && !isLoading ? (
+            {testResults.length === 0 && !isRunningTest ? (
               <div className="flex-1 flex flex-col items-center justify-center text-gray-600">
                 <Clock className="w-12 h-12 mb-2 opacity-20" />
                 <p>No tests run yet.</p>
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto pr-2 space-y-2">
-                {testResults.map((step) => (
-                  <div
-                    key={step.id}
-                    className={clsx(
-                      "border rounded-lg p-4 flex items-center justify-between transition-colors",
-                      step.status === "fail"
-                        ? "bg-red-900/10 border-red-900/30 hover:border-red-800/50"
-                        : "bg-gray-900 border-gray-800 hover:border-gray-700"
-                    )}
-                  >
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-3">
-                        {step.status === "pass" && (
-                          <CheckCircle className="w-5 h-5 text-green-500" />
-                        )}
-                        {step.status === "fail" && (
-                          <XCircle className="w-5 h-5 text-red-500" />
-                        )}
-                        {step.status === "running" && (
-                          <Activity className="w-5 h-5 text-blue-500 animate-spin" />
-                        )}
-                        {step.status === "pending" && (
-                          <Clock className="w-5 h-5 text-gray-600" />
-                        )}
-
-                        <span
-                          className={clsx(
-                            "font-medium",
-                            step.status === "pending"
-                              ? "text-gray-500"
-                              : "text-gray-200",
-                            step.status === "fail" && "text-red-200"
-                          )}
-                        >
-                          {step.stepName}
-                        </span>
+              <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+                {testResults.map((run) => (
+                  <div key={run.id} className="flex flex-col gap-2">
+                    {/* Test Run Header */}
+                    <div className="flex items-center justify-between border-b border-gray-800 pb-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                        <h3 className="font-semibold text-gray-200">
+                          {run.title}
+                        </h3>
                       </div>
-
-                      {/* Error Message Display */}
-                      {step.status === "fail" && step.errorMessage && (
-                        <div className="ml-8 text-xs text-red-400 flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" />
-                          {step.errorMessage}
-                        </div>
-                      )}
+                      <span className="text-xs text-gray-500 font-mono">
+                        {run.timestamp}
+                      </span>
                     </div>
 
-                    <div className="flex flex-col items-end gap-1">
-                      <div className="text-sm font-mono text-gray-500">
-                        {step.duration}
-                      </div>
-                      <div className="text-xs text-gray-600">
-                        {step.timestamp}
-                      </div>
+                    {/* Steps List */}
+                    <div className="space-y-2">
+                      {run.steps.map((step) => (
+                        <div
+                          key={step.id}
+                          className={clsx(
+                            "border rounded-lg p-4 flex items-center justify-between transition-colors",
+                            step.status === "fail"
+                              ? "bg-red-900/10 border-red-900/30 hover:border-red-800/50"
+                              : "bg-gray-900 border-gray-800 hover:border-gray-700"
+                          )}
+                        >
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-3">
+                              {step.status === "pass" && (
+                                <CheckCircle className="w-5 h-5 text-green-500" />
+                              )}
+                              {step.status === "fail" && (
+                                <XCircle className="w-5 h-5 text-red-500" />
+                              )}
+                              {step.status === "running" && (
+                                <Activity className="w-5 h-5 text-blue-500 animate-spin" />
+                              )}
+                              {step.status === "pending" && (
+                                <Clock className="w-5 h-5 text-gray-600" />
+                              )}
+
+                              <span
+                                className={clsx(
+                                  "font-medium",
+                                  step.status === "pending"
+                                    ? "text-gray-500"
+                                    : "text-gray-200",
+                                  step.status === "fail" && "text-red-200"
+                                )}
+                              >
+                                {step.stepName}
+                              </span>
+                            </div>
+
+                            {/* Error Message Display */}
+                            {step.status === "fail" && step.errorMessage && (
+                              <div className="ml-8 text-xs text-red-400 flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" />
+                                {step.errorMessage}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex flex-col items-end gap-1">
+                            <div className="text-sm font-mono text-gray-500">
+                              {step.duration}
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              {step.timestamp}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
