@@ -1,18 +1,5 @@
-"""
-Async Execution Engine for TestFlow AI
-
-Production-grade executor with:
-- Async Playwright for non-blocking FastAPI integration
-- Pydantic validation for strict schema enforcement
-- Screenshot capture on failure (Base64 encoded)
-- Tracing support for debugging
-- Red Halo visual feedback for Passive View mode
-"""
-
 import asyncio
-import base64
 import os
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from playwright.async_api import (
@@ -24,8 +11,8 @@ from playwright.async_api import (
 )
 from pydantic import ValidationError
 
-from .schemas import Plan, Target, ExecutionResult
-from .visual_fx import RED_HALO_SCRIPT
+from schemas import Plan, Target, ExecutionResult
+from visual_fx import RED_HALO_SCRIPT
 
 
 TRACE_DIR = os.path.join(os.path.dirname(__file__), "traces")
@@ -55,12 +42,6 @@ async def build_locator(page: Page, target: Target) -> Locator:
     raise RuntimeError(f"Unsupported strategy: {strategy}")
 
 
-async def capture_screenshot_base64(page: Page) -> str:
-    """Capture a screenshot and return as Base64 string."""
-    screenshot_bytes = await page.screenshot(type="png", full_page=False)
-    return base64.b64encode(screenshot_bytes).decode("utf-8")
-
-
 async def collect_visible_error_text(page: Page) -> List[str]:
     """Collect common visible error messages from the page."""
     candidates = [
@@ -85,18 +66,24 @@ async def collect_visible_error_text(page: Page) -> List[str]:
     return list(dict.fromkeys(texts))
 
 
+async def capture_screenshot_base64(page: Page) -> str:
+    """Capture a screenshot and return as Base64 string."""
+    # Function kept for interface compatibility but does nothing
+    return ""
+
+
 async def run_execution_plan(
     plan_json: Dict[str, Any],
     *,
     headless: bool = False,
     slow_mo_ms: int = 0,
     default_timeout_ms: int = 15000,
-    enable_tracing: bool = True,
+    enable_tracing: bool = False,  # Changed default to False
 ) -> Dict[str, Any]:
     """
     Execute a test plan asynchronously with visual feedback.
     
-    Returns ExecutionResult dict with ok, results, log, error, screenshot_base64, trace_path.
+    Returns ExecutionResult dict with ok, results, log, error.
     """
     try:
         plan = Plan(**plan_json)
@@ -110,8 +97,6 @@ async def run_execution_plan(
     log: List[str] = []
     results: Dict[str, Any] = {}
     error_obj: Optional[Dict[str, Any]] = None
-    screenshot_b64: Optional[str] = None
-    trace_path: Optional[str] = None
     
     current_step_id: Optional[int] = None
     current_action: Optional[str] = None
@@ -130,10 +115,6 @@ async def run_execution_plan(
         context: BrowserContext = await browser.new_context(viewport=VIEWPORT)
         page: Page = await context.new_page()
         page.set_default_timeout(default_timeout_ms)
-        
-        if enable_tracing:
-            os.makedirs(TRACE_DIR, exist_ok=True)
-            await context.tracing.start(screenshots=True, snapshots=True)
         
         def on_dialog(dialog):
             dialog_errors.append({
@@ -196,18 +177,11 @@ async def run_execution_plan(
                         results[str(step_id)] = {"read_text": text}
             
             log.append("Execution completed successfully")
-            if enable_tracing:
-                await context.tracing.stop()
             
             return ExecutionResult(ok=True, results=results, log=log).model_dump()
         
         except PlaywrightTimeoutError as e:
             log.append(f"TIMEOUT at step {current_step_id}: {e}")
-            
-            try:
-                screenshot_b64 = await capture_screenshot_base64(page)
-            except Exception:
-                pass
             
             if dialog_errors:
                 last = dialog_errors[-1]
@@ -230,22 +204,12 @@ async def run_execution_plan(
                     "ui_errors": ui_errors,
                 }
             
-            if enable_tracing:
-                trace_path = os.path.join(TRACE_DIR, f"trace_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip")
-                await context.tracing.stop(path=trace_path)
-            
             return ExecutionResult(
                 ok=False, results=results, log=log, error=error_obj,
-                screenshot_base64=screenshot_b64, trace_path=trace_path,
             ).model_dump()
         
         except Exception as e:
             log.append(f"ERROR at step {current_step_id}: {type(e).__name__}: {e}")
-            
-            try:
-                screenshot_b64 = await capture_screenshot_base64(page)
-            except Exception:
-                pass
             
             error_obj = {
                 "type": type(e).__name__,
@@ -255,16 +219,8 @@ async def run_execution_plan(
                 "url": page.url if page else None,
             }
             
-            if enable_tracing:
-                try:
-                    trace_path = os.path.join(TRACE_DIR, f"trace_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip")
-                    await context.tracing.stop(path=trace_path)
-                except Exception:
-                    pass
-            
             return ExecutionResult(
                 ok=False, results=results, log=log, error=error_obj,
-                screenshot_base64=screenshot_b64, trace_path=trace_path,
             ).model_dump()
         
         finally:
@@ -295,9 +251,6 @@ if __name__ == "__main__":
         plan = json.load(f)
     
     result = run_plan_sync(plan, headless=not args.headed, slow_mo_ms=args.slowmo, enable_tracing=not args.no_trace)
-    
-    if result.get("screenshot_base64"):
-        result["screenshot_base64"] = f"<{len(result['screenshot_base64'])} chars>"
     
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
