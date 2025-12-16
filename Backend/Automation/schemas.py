@@ -128,13 +128,9 @@ class ExecutionResult(BaseModel):
         results: Dict of step results (e.g., read text)
         log: List of execution log messages
         error: Error details if execution failed
-        screenshot_base64: Base64-encoded screenshot on failure
-        trace_path: Path to trace file on failure
     """
     ok: bool
     results: dict = Field(default_factory=dict)
     log: List[str] = Field(default_factory=list)
     error: Optional[dict] = None
-    screenshot_base64: Optional[str] = None
-    trace_path: Optional[str] = None
 

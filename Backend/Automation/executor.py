@@ -1,6 +1,7 @@
 import asyncio
 import os
-from typing import Any, Dict, List, Optional
+import json
+from typing import Any, Dict, List, Optional, AsyncGenerator
 
 from playwright.async_api import (
     async_playwright,
@@ -78,25 +79,32 @@ async def run_execution_plan(
     headless: bool = False,
     slow_mo_ms: int = 0,
     default_timeout_ms: int = 15000,
-    enable_tracing: bool = False,  # Changed default to False
-) -> Dict[str, Any]:
+    enable_tracing: bool = False,
+) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Execute a test plan asynchronously with visual feedback.
     
-    Returns ExecutionResult dict with ok, results, log, error.
+    Yields events with uniform structure:
+    {
+        "step_id": int | None,
+        "message": str,
+        "status": "running" | "success" | "failure",
+        "reason": str | None
+    }
     """
     try:
         plan = Plan(**plan_json)
     except ValidationError as e:
-        return ExecutionResult(
-            ok=False,
-            error={"type": "VALIDATION_ERROR", "message": "Plan validation failed", "details": e.errors()},
-            log=[f"VALIDATION_ERROR: {e}"],
-        ).model_dump()
+        yield {
+            "step_id": None,
+            "message": "Plan validation failed",
+            "status": "failure",
+            "reason": str(e)
+        }
+        return
     
     log: List[str] = []
     results: Dict[str, Any] = {}
-    error_obj: Optional[Dict[str, Any]] = None
     
     current_step_id: Optional[int] = None
     current_action: Optional[str] = None
@@ -105,6 +113,10 @@ async def run_execution_plan(
     dialog_context_step_id: Optional[int] = None
     dialog_context_action: Optional[str] = None
     
+    # Flag to track if any failure occurred, but we continue execution
+    has_failure = False
+    first_error_obj = None
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=headless,
@@ -142,8 +154,20 @@ async def run_execution_plan(
                 
                 current_step_id = step_id
                 current_action = action
+                
+                # Yield running state
+                yield {
+                    "step_id": step_id,
+                    "message": f"{desc} ({action})",
+                    "status": "running",
+                    "reason": None
+                }
+                
                 log.append(f"[{step_id}] {desc} ({action})")
                 
+                step_failed = False
+                step_fail_reason = None
+
                 if action == "navigate":
                     set_dialog_context(step_id, action)
                     await page.goto(str(data), wait_until="domcontentloaded")
@@ -175,70 +199,122 @@ async def run_execution_plan(
                     elif action == "read":
                         text = await loc.first.inner_text()
                         results[str(step_id)] = {"read_text": text}
-            
-            log.append("Execution completed successfully")
-            
-            return ExecutionResult(ok=True, results=results, log=log).model_dump()
+                        # For read, we can consider it a success immediately with the value
+                        yield {
+                            "step_id": step_id,
+                            "message": f"Read value: {text}",
+                            "status": "success",
+                            "reason": None
+                        }
+                        continue # Skip the generic success yield at the end of loop
+
+                    # Check for errors immediately after interaction
+                    if action in {"click", "fill", "press"}:
+                        await asyncio.sleep(0.5)
+                        
+                        # 1. Check for Dialog/Alert errors
+                        if dialog_errors:
+                            last_dialog = dialog_errors[-1]
+                            if last_dialog.get("step_id") == step_id:
+                                step_failed = True
+                                step_fail_reason = f"Dialog Error: {last_dialog['message']}"
+                                dialog_errors = [] # Clear
+
+                        # 2. Check for UI errors (text on page)
+                        if not step_failed:
+                            ui_errors = await collect_visible_error_text(page)
+                            if ui_errors:
+                                step_failed = True
+                                step_fail_reason = f"UI Error: {'; '.join(ui_errors)}"
+
+                if step_failed:
+                    has_failure = True
+                    log.append(f"[{step_id}] FAILURE: {step_fail_reason}")
+                    yield {
+                        "step_id": step_id,
+                        "message": "Failed",
+                        "status": "failure",
+                        "reason": step_fail_reason
+                    }
+                    if first_error_obj is None:
+                        first_error_obj = {
+                            "step_id": step_id,
+                            "action": action,
+                            "message": step_fail_reason
+                        }
+                elif action != "read":
+                    # If not failed and not read (read already yielded success)
+                    yield {
+                        "step_id": step_id,
+                        "message": "Succeeded",
+                        "status": "success",
+                        "reason": None
+                    }
+
+            # Final completion event
+            if has_failure:
+                yield {
+                    "step_id": None,
+                    "message": "Execution completed with failures",
+                    "status": "failure",
+                    "reason": "One or more steps failed"
+                }
+            else:
+                yield {
+                    "step_id": None,
+                    "message": "Execution completed successfully",
+                    "status": "success",
+                    "reason": None
+                }
         
         except PlaywrightTimeoutError as e:
             log.append(f"TIMEOUT at step {current_step_id}: {e}")
-            
-            if dialog_errors:
-                last = dialog_errors[-1]
-                error_obj = {
-                    "type": "DOMAIN_ERROR",
-                    "code": "AUTH_DIALOG_ERROR",
-                    "step_id": last.get("step_id"),
-                    "action": last.get("action"),
-                    "dialog": {"type": last.get("type"), "message": last.get("message")},
-                    "url": page.url,
-                }
-            else:
-                ui_errors = await collect_visible_error_text(page)
-                error_obj = {
-                    "type": "PLAYWRIGHT_TIMEOUT",
-                    "step_id": current_step_id,
-                    "action": current_action,
-                    "message": str(e),
-                    "url": page.url,
-                    "ui_errors": ui_errors,
-                }
-            
-            return ExecutionResult(
-                ok=False, results=results, log=log, error=error_obj,
-            ).model_dump()
+            yield {
+                "step_id": current_step_id,
+                "message": "Timeout occurred",
+                "status": "failure",
+                "reason": str(e)
+            }
+            yield {
+                "step_id": None,
+                "message": "Execution stopped due to timeout",
+                "status": "failure",
+                "reason": str(e)
+            }
         
         except Exception as e:
             log.append(f"ERROR at step {current_step_id}: {type(e).__name__}: {e}")
-            
-            error_obj = {
-                "type": type(e).__name__,
+            yield {
                 "step_id": current_step_id,
-                "action": current_action,
-                "message": str(e),
-                "url": page.url if page else None,
+                "message": "Unexpected error",
+                "status": "failure",
+                "reason": str(e)
             }
-            
-            return ExecutionResult(
-                ok=False, results=results, log=log, error=error_obj,
-            ).model_dump()
+            yield {
+                "step_id": None,
+                "message": "Execution stopped due to error",
+                "status": "failure",
+                "reason": str(e)
+            }
         
         finally:
             await context.close()
             await browser.close()
 
 
-def run_plan_sync(plan_json: Dict[str, Any], **kwargs) -> Dict[str, Any]:
-    """Synchronous wrapper for CLI usage."""
-    import sys
-    if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-    return asyncio.run(run_execution_plan(plan_json, **kwargs))
+async def run_plan_cli(plan_json: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    """Async wrapper for CLI usage that prints events."""
+    final_result = {}
+    async for event in run_execution_plan(plan_json, **kwargs):
+        print(json.dumps(event, ensure_ascii=False))
+        # We no longer return the full ExecutionResult object in the stream
+        # But we can track the final status
+    return final_result
 
 
 if __name__ == "__main__":
     import argparse
-    import json
+    import sys
     
     parser = argparse.ArgumentParser(description="Run AI JSON plan with async Playwright.")
     parser.add_argument("--plan-file", required=True, help="Path to JSON file.")
@@ -250,7 +326,8 @@ if __name__ == "__main__":
     with open(args.plan_file, "r", encoding="utf-8") as f:
         plan = json.load(f)
     
-    result = run_plan_sync(plan, headless=not args.headed, slow_mo_ms=args.slowmo, enable_tracing=not args.no_trace)
-    
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+        
+    asyncio.run(run_plan_cli(plan, headless=not args.headed, slow_mo_ms=args.slowmo, enable_tracing=not args.no_trace))
 
