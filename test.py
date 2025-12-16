@@ -3,7 +3,7 @@ from playwright.sync_api import sync_playwright, TimeoutError
 
 URL = "https://savingplan.web.app/"
 USERNAME = "yossijosko@gmail.com"
-PASSWORD = "Ry5563"
+PASSWORD = "Ry5563us"
 
 if not USERNAME or not PASSWORD:
     raise SystemExit("Set env vars: SAVINGPLAN_USERNAME and SAVINGPLAN_PASSWORD")
