@@ -22,7 +22,7 @@ export const apiService = {
 
     if (USE_MOCK) {
       console.log(
-        "🚀 [Mock Request] setTargetUrl Payload:",
+        "🚀 [Payload] setTargetUrl:",
         JSON.stringify(payload, null, 2)
       );
       await simulateDelay(2000);
@@ -42,7 +42,7 @@ export const apiService = {
    * @param {string} userId
    * @returns {Promise<{status: string, title: string, results: Array}>}
    */
-  runTestPrompt: async (prompt, userId) => {
+  sendPrompt: async (prompt, userId) => {
     // Construct the exact payload expected by the backend
     const payload = {
       user_id: userId,
@@ -50,10 +50,7 @@ export const apiService = {
     };
 
     if (USE_MOCK) {
-      console.log(
-        "🚀 [Mock Request] runTestPrompt Payload:",
-        JSON.stringify(payload, null, 2)
-      );
+      console.log("🚀 [Payload] sendPrompt:", JSON.stringify(payload, null, 2));
       await simulateDelay(3000);
 
       // Mock Title Generation Logic (Simulating LLM summarization)
@@ -69,13 +66,16 @@ export const apiService = {
         title = "Form Submission Test";
       } else if (p.length > 0) {
         // Capitalize first letter and truncate
-        title = prompt.charAt(0).toUpperCase() + prompt.slice(1, 25) + (prompt.length > 25 ? "..." : "");
+        title =
+          prompt.charAt(0).toUpperCase() +
+          prompt.slice(1, 25) +
+          (prompt.length > 25 ? "..." : "");
       }
 
-      return { 
-        status: "completed", 
+      return {
+        status: "completed",
         title: title,
-        results: MOCK_TEST_RESULTS 
+        results: MOCK_TEST_RESULTS,
       };
     } else {
       const response = await axios.post(`${API_BASE_URL}/generate`, payload);
@@ -97,14 +97,14 @@ export const apiService = {
 
     if (USE_MOCK) {
       console.log(
-        "🚀 [Mock Request] runFullSiteScan Payload:",
+        "🚀 [Payload] runFullSiteScan:",
         JSON.stringify(payload, null, 2)
       );
       await simulateDelay(3000);
-      return { 
-        status: "completed", 
+      return {
+        status: "completed",
         title: "Autonomous Full Site Audit",
-        results: MOCK_FULL_SCAN_RESULTS 
+        results: MOCK_FULL_SCAN_RESULTS,
       };
     } else {
       const response = await axios.post(`${API_BASE_URL}/scan`, payload);
