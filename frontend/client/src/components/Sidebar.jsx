@@ -1,64 +1,69 @@
 import React from "react";
+import PropTypes from "prop-types";
 import { Activity, Cpu, Shield, Zap } from "lucide-react";
 import { GlassCard } from "./ui/GlassCard";
 
 export const Sidebar = ({ userId }) => {
   return (
-    <GlassCard className="w-72 flex flex-col h-full border-r-0" delay={0.1}>
-      <div className="p-6 border-b border-gray-200 dark:border-white/10 flex items-center gap-3 bg-gray-50/50 dark:bg-white/5 transition-colors duration-300">
-        <div className="p-2 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg border border-blue-500/20 dark:border-blue-500/30">
-          <Activity className="text-blue-600 dark:text-blue-400 w-6 h-6" />
+    <GlassCard
+      className="w-64 flex flex-col h-full border-r-0 rounded-lg"
+      delay={0.1}
+    >
+      <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex items-center gap-3">
+        <div className="p-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-gray-200 dark:border-gray-700">
+          <Activity className="text-zinc-900 dark:text-white w-5 h-5" />
         </div>
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white transition-colors duration-300">
-            TestFlow AI
+          <h1 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white">
+            TestFlow
           </h1>
-          <p className="text-xs text-blue-600/70 dark:text-blue-300/70 font-mono transition-colors duration-300">
-            AUTONOMOUS AGENT
+          <p className="text-[10px] text-gray-500 font-medium tracking-wide">
+            AI AGENT
           </p>
         </div>
       </div>
 
-      <div className="p-6 flex-1 flex flex-col gap-6">
-        <div className="flex items-center gap-3 text-sm text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-4 py-3 rounded-xl border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)] transition-colors duration-300">
-          <div className="relative">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-ping absolute inset-0" />
-            <div className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 relative z-10" />
-          </div>
-          <span className="font-medium tracking-wide">SYSTEM ONLINE</span>
+      <div className="p-4 flex-1 flex flex-col gap-2">
+        <div className="flex items-center gap-3 text-xs font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-md border border-green-200 dark:border-green-900/30 mb-4">
+          <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+          <span className="tracking-wide">SYSTEM ONLINE</span>
         </div>
 
-        <div className="space-y-4">
-          <div className="text-xs font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest">
+        <div className="space-y-1">
+          <div className="px-2 py-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
             Modules
           </div>
-          <div className="flex items-center gap-3 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer group">
-            <Cpu className="w-5 h-5 text-blue-600 dark:text-blue-500 group-hover:text-blue-500 dark:group-hover:text-blue-400" />
+          <div className="flex items-center gap-3 px-2 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-md transition-colors cursor-pointer">
+            <Cpu className="w-4 h-4" />
             <span>Core Engine</span>
           </div>
-          <div className="flex items-center gap-3 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer group">
-            <Shield className="w-5 h-5 text-purple-600 dark:text-purple-500 group-hover:text-purple-500 dark:group-hover:text-purple-400" />
-            <span>Security Protocol</span>
+          <div className="flex items-center gap-3 px-2 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-md transition-colors cursor-pointer">
+            <Shield className="w-4 h-4" />
+            <span>Security</span>
           </div>
-          <div className="flex items-center gap-3 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer group">
-            <Zap className="w-5 h-5 text-yellow-600 dark:text-yellow-500 group-hover:text-yellow-500 dark:group-hover:text-yellow-400" />
-            <span>Performance Metrics</span>
+          <div className="flex items-center gap-3 px-2 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-md transition-colors cursor-pointer">
+            <Zap className="w-4 h-4" />
+            <span>Performance</span>
           </div>
         </div>
 
         <div className="mt-auto">
-          <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-            Session Context
+          <div className="px-2 py-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+            Session
           </div>
-          <div className="p-3 bg-black/40 rounded-lg border border-white/5 font-mono text-xs text-gray-400 break-all">
+          <div className="px-3 py-2 bg-gray-50 dark:bg-zinc-800/50 rounded-md border border-gray-200 dark:border-gray-800 font-mono text-[10px] text-gray-500 break-all">
             {userId || "Initializing..."}
           </div>
         </div>
       </div>
 
-      <div className="p-4 text-[10px] text-gray-600 text-center border-t border-white/5 uppercase tracking-widest">
-        v0.1.0 Alpha Build
+      <div className="p-4 text-[10px] text-gray-400 text-center border-t border-gray-200 dark:border-gray-800">
+        v0.1.0 Alpha
       </div>
     </GlassCard>
   );
+};
+
+Sidebar.propTypes = {
+  userId: PropTypes.string,
 };
