@@ -6,7 +6,10 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export const ResultsLog = ({ testHistory, isRunningTest }) => {
   return (
-    <GlassCard className="h-1/2 p-0 flex flex-col overflow-hidden" delay={0.4}>
+    <GlassCard
+      className="w-full h-full p-0 flex flex-col overflow-hidden"
+      delay={0.4}
+    >
       <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2">
         <List className="w-4 h-4 text-gray-500" />
         <h2 className="text-sm font-semibold text-gray-900 dark:text-white">

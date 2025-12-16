@@ -6,7 +6,7 @@ import { GlassCard } from "./ui/GlassCard";
 export const Sidebar = ({ userId }) => {
   return (
     <GlassCard
-      className="w-64 flex flex-col h-full border-r-0 rounded-lg"
+      className="w-full flex flex-col h-full border-r-0 rounded-lg"
       delay={0.1}
     >
       <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex items-center gap-3">

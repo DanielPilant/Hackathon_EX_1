@@ -32,7 +32,7 @@ export const ControlPanel = ({
   };
 
   return (
-    <GlassCard className="w-1/3 p-6 flex flex-col gap-6" delay={0.2}>
+    <GlassCard className="w-full h-full p-6 flex flex-col gap-6" delay={0.2}>
       {/* URL Section */}
       <div className="space-y-2">
         <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">

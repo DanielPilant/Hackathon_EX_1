@@ -4,7 +4,10 @@ import { GlassCard } from "./ui/GlassCard";
 
 export const VideoPlayer = () => {
   return (
-    <GlassCard className="h-1/2 p-0 flex flex-col overflow-hidden" delay={0.3}>
+    <GlassCard
+      className="w-full h-full p-0 flex flex-col overflow-hidden"
+      delay={0.3}
+    >
       <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2">
         <Monitor className="w-4 h-4 text-gray-500" />
         <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
