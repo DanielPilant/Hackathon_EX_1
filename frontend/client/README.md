@@ -1,3 +1,26 @@
+# Frontend Client
+
+## Project Setup
+
+### Prerequisites
+
+- Node.js (v18 or higher)
+- npm
+
+### Installation
+
+To install all dependencies (equivalent to `pip install -r requirements.txt` in Python), run:
+
+```bash
+npm install
+```
+
+### Running the App
+
+```bash
+npm run dev
+```
+
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
