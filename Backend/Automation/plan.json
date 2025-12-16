@@ -1,0 +1,55 @@
+{
+  "plan": [
+    {
+      "step_id": 1,
+      "description": "Navigating to the login page",
+      "action": "navigate",
+      "target": null,
+      "data": "https://savingplan.web.app/"
+    },
+    {
+      "step_id": 2,
+      "description": "Filling email field",
+      "action": "fill",
+      "target": {
+        "strategy": "label",
+        "role_type": null,
+        "selector": "אימייל"
+      },
+      "data": "yossijosko@gmail.com"
+    },
+    {
+      "step_id": 3,
+      "description": "Filling password field",
+      "action": "fill",
+      "target": {
+        "strategy": "label",
+        "role_type": null,
+        "selector": "סיסמה"
+      },
+      "data": "Ry556"
+    },
+    {
+      "step_id": 4,
+      "description": "Submitting login form",
+      "action": "click",
+      "target": {
+        "strategy": "css",
+        "role_type": null,
+        "selector": "form#loginForm button[type='submit']"
+      },
+      "data": null
+    },
+    {
+      "step_id": 5,
+      "description": "Waiting for app screen to appear",
+      "action": "read",
+      "target": {
+        "strategy": "css",
+        "role_type": null,
+        "selector": "#appScreen"
+      },
+      "data": null
+    }
+  ]
+}
