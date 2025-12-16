@@ -43,7 +43,8 @@ export const MOCK_TEST_RESULTS = [
     status: "fail",
     duration: "5.0s",
     timestamp: "10:45:09 AM",
-    errorMessage: "AssertionError: Expected 'Welcome User' but found 'Login Failed'",
+    errorMessage:
+      "AssertionError: Expected 'Welcome User' but found 'Login Failed'",
   },
   {
     id: 6,

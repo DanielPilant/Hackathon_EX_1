@@ -1,42 +1,50 @@
-import { useState } from 'react'
-import { Play, Activity, CheckCircle, XCircle, Clock, Globe, MessageSquare, AlertCircle } from 'lucide-react'
-import { apiService } from './services/api'
-import clsx from 'clsx'
+import { useState } from "react";
+import {
+  Play,
+  Activity,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Globe,
+  MessageSquare,
+  AlertCircle,
+} from "lucide-react";
+import { apiService } from "./services/api";
+import clsx from "clsx";
 
 function App() {
-  const [targetUrl, setTargetUrl] = useState('')
-  const [userPrompt, setUserPrompt] = useState('')
-  const [testResults, setTestResults] = useState([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [currentStatus, setCurrentStatus] = useState('idle') // 'idle', 'connecting', 'processing'
+  const [targetUrl, setTargetUrl] = useState("");
+  const [userPrompt, setUserPrompt] = useState("");
+  const [testResults, setTestResults] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState("idle"); // 'idle', 'connecting', 'processing'
 
   const handleRunTest = async () => {
-    if (!targetUrl || !userPrompt) return
-    
-    setIsLoading(true)
-    setTestResults([]) // Clear previous results
-    
+    if (!targetUrl || !userPrompt) return;
+
+    setIsLoading(true);
+    setTestResults([]); // Clear previous results
+
     try {
       // Step 1: Set Target URL
-      setCurrentStatus('connecting')
-      await apiService.setTargetUrl(targetUrl)
-      
+      setCurrentStatus("connecting");
+      await apiService.setTargetUrl(targetUrl);
+
       // Step 2: Send Prompt & Get Results
-      setCurrentStatus('processing')
-      const response = await apiService.sendPrompt(userPrompt)
-      
-      if (response.status === 'completed') {
-        setTestResults(response.results)
+      setCurrentStatus("processing");
+      const response = await apiService.sendPrompt(userPrompt);
+
+      if (response.status === "completed") {
+        setTestResults(response.results);
       }
-      
     } catch (error) {
-      console.error("Test execution failed:", error)
+      console.error("Test execution failed:", error);
       // Ideally show an error toast here
     } finally {
-      setIsLoading(false)
-      setCurrentStatus('idle')
+      setIsLoading(false);
+      setCurrentStatus("idle");
     }
-  }
+  };
 
   return (
     <div className="flex h-screen bg-gray-900 text-white font-sans">
@@ -98,8 +106,10 @@ function App() {
           >
             {isLoading ? (
               <>
-                <Activity className="w-5 h-5 animate-spin" /> 
-                {currentStatus === 'connecting' ? 'Connecting...' : 'Processing Prompt...'}
+                <Activity className="w-5 h-5 animate-spin" />
+                {currentStatus === "connecting"
+                  ? "Connecting..."
+                  : "Processing Prompt..."}
               </>
             ) : (
               <>
@@ -123,7 +133,9 @@ function App() {
                 <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
                   <Play className="w-8 h-8 text-gray-600" />
                 </div>
-                <p className="text-gray-500 font-medium">Waiting for execution stream...</p>
+                <p className="text-gray-500 font-medium">
+                  Waiting for execution stream...
+                </p>
               </div>
             </div>
           </div>
@@ -133,7 +145,7 @@ function App() {
             <h2 className="text-sm font-medium text-gray-400 mb-4 flex items-center gap-2">
               <CheckCircle className="w-4 h-4" /> Test Results
             </h2>
-            
+
             {testResults.length === 0 && !isLoading ? (
               <div className="flex-1 flex flex-col items-center justify-center text-gray-600">
                 <Clock className="w-12 h-12 mb-2 opacity-20" />
@@ -146,29 +158,41 @@ function App() {
                     key={step.id}
                     className={clsx(
                       "border rounded-lg p-4 flex items-center justify-between transition-colors",
-                      step.status === 'fail' 
-                        ? "bg-red-900/10 border-red-900/30 hover:border-red-800/50" 
+                      step.status === "fail"
+                        ? "bg-red-900/10 border-red-900/30 hover:border-red-800/50"
                         : "bg-gray-900 border-gray-800 hover:border-gray-700"
                     )}
                   >
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-3">
-                        {step.status === 'pass' && <CheckCircle className="w-5 h-5 text-green-500" />}
-                        {step.status === 'fail' && <XCircle className="w-5 h-5 text-red-500" />}
-                        {step.status === 'running' && <Activity className="w-5 h-5 text-blue-500 animate-spin" />}
-                        {step.status === 'pending' && <Clock className="w-5 h-5 text-gray-600" />}
-                        
-                        <span className={clsx(
-                          "font-medium",
-                          step.status === 'pending' ? "text-gray-500" : "text-gray-200",
-                          step.status === 'fail' && "text-red-200"
-                        )}>
+                        {step.status === "pass" && (
+                          <CheckCircle className="w-5 h-5 text-green-500" />
+                        )}
+                        {step.status === "fail" && (
+                          <XCircle className="w-5 h-5 text-red-500" />
+                        )}
+                        {step.status === "running" && (
+                          <Activity className="w-5 h-5 text-blue-500 animate-spin" />
+                        )}
+                        {step.status === "pending" && (
+                          <Clock className="w-5 h-5 text-gray-600" />
+                        )}
+
+                        <span
+                          className={clsx(
+                            "font-medium",
+                            step.status === "pending"
+                              ? "text-gray-500"
+                              : "text-gray-200",
+                            step.status === "fail" && "text-red-200"
+                          )}
+                        >
                           {step.stepName}
                         </span>
                       </div>
-                      
+
                       {/* Error Message Display */}
-                      {step.status === 'fail' && step.errorMessage && (
+                      {step.status === "fail" && step.errorMessage && (
                         <div className="ml-8 text-xs text-red-400 flex items-center gap-1">
                           <AlertCircle className="w-3 h-3" />
                           {step.errorMessage}
@@ -192,7 +216,7 @@ function App() {
         </div>
       </main>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
