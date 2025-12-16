@@ -6,8 +6,11 @@ import {
   MessageSquare,
   Play,
   Zap,
+  Loader2,
 } from "lucide-react";
 import clsx from "clsx";
+import { GlassCard } from "./ui/GlassCard";
+import { GlowButton } from "./ui/GlowButton";
 
 export const ControlPanel = ({
   isConnected,
@@ -30,128 +33,111 @@ export const ControlPanel = ({
   };
 
   return (
-    <div className="w-1/3 p-6 border-r border-gray-700 flex flex-col gap-6 bg-gray-900/50">
+    <GlassCard className="w-1/3 p-6 flex flex-col gap-8" delay={0.2}>
       {/* URL Section */}
-      <div>
-        <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
-          <Globe className="w-4 h-4" /> Target Website URL
+      <div className="space-y-3">
+        <label className="text-sm font-bold text-blue-600 dark:text-blue-300 uppercase tracking-wider flex items-center gap-2 transition-colors duration-300">
+          <Globe className="w-4 h-4" /> Target Interface
         </label>
         <div className="flex gap-2">
-          <input
-            type="text"
-            value={targetUrl}
-            onChange={(e) => setTargetUrl(e.target.value)}
-            disabled={isConnected || isScanning}
-            placeholder="https://example.com"
-            className={clsx(
-              "flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all",
-              (isConnected || isScanning) && "opacity-50 cursor-not-allowed"
-            )}
-          />
-          <button
+          <div className="relative flex-1 group">
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl opacity-20 group-hover:opacity-50 transition duration-500 blur"></div>
+            <input
+              type="text"
+              value={targetUrl}
+              onChange={(e) => setTargetUrl(e.target.value)}
+              disabled={isConnected || isScanning}
+              placeholder="https://target-system.com"
+              className={clsx(
+                "relative w-full bg-white dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-mono text-sm",
+                (isConnected || isScanning) && "opacity-50 cursor-not-allowed"
+              )}
+            />
+          </div>
+
+          <GlowButton
             onClick={handleConnect}
             disabled={isConnected || isScanning || !targetUrl}
             className={clsx(
-              "px-4 rounded-lg font-bold text-sm flex items-center justify-center transition-all",
+              "min-w-[100px]",
               isConnected
-                ? "bg-green-600 text-white cursor-default"
-                : "bg-blue-600 hover:bg-blue-500 text-white",
-              (isScanning || !targetUrl) &&
-                !isConnected &&
-                "opacity-50 cursor-not-allowed"
+                ? "bg-emerald-600 hover:bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.4)]"
+                : ""
             )}
           >
             {isConnected ? (
               <CheckCircle className="w-5 h-5" />
             ) : isScanning ? (
-              <Activity className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
-              "Scan"
+              "Connect"
             )}
-          </button>
+          </GlowButton>
         </div>
+
         {isConnected && (
-          <div className="mt-2 text-xs text-green-400 flex items-center gap-1">
-            <CheckCircle className="w-3 h-3" /> Connected to Brain
+          <div className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-2 font-mono animate-pulse transition-colors duration-300">
+            <span className="w-1.5 h-1.5 bg-emerald-500 dark:bg-emerald-400 rounded-full"></span>
+            UPLINK ESTABLISHED
           </div>
         )}
       </div>
 
       {/* Prompt Section */}
-      <div className="flex-1 flex flex-col">
-        <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
-          <MessageSquare className="w-4 h-4" /> Test Instructions
+      <div className="flex-1 flex flex-col space-y-3">
+        <label className="text-sm font-bold text-purple-600 dark:text-purple-300 uppercase tracking-wider flex items-center gap-2 transition-colors duration-300">
+          <MessageSquare className="w-4 h-4" /> Directive Input
         </label>
-        <textarea
-          value={userPrompt}
-          onChange={(e) => setUserPrompt(e.target.value)}
-          disabled={!isConnected}
-          placeholder={
-            isConnected
-              ? "Describe your test case..."
-              : "Please connect to a URL first."
-          }
-          className={clsx(
-            "w-full flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none transition-all",
-            !isConnected && "opacity-50 cursor-not-allowed"
-          )}
-        />
+        <div className="relative flex-1 group">
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-500 rounded-xl opacity-20 group-hover:opacity-40 transition duration-500 blur"></div>
+          <textarea
+            value={userPrompt}
+            onChange={(e) => setUserPrompt(e.target.value)}
+            disabled={!isConnected}
+            placeholder={
+              isConnected
+                ? "// Enter natural language test parameters..."
+                : "// Awaiting target connection..."
+            }
+            className={clsx(
+              "relative w-full h-full bg-white dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-4 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all font-mono text-sm resize-none",
+              !isConnected && "opacity-50 cursor-not-allowed"
+            )}
+          />
+        </div>
       </div>
 
-      <div className="flex flex-col gap-3">
-        <button
+      <div className="flex flex-col gap-4 pt-4 border-t border-gray-200 dark:border-white/5 transition-colors duration-300">
+        <GlowButton
           onClick={handleRunTest}
           disabled={
             isRunningTest || isFullScanning || !isConnected || !userPrompt
           }
-          className={clsx(
-            "w-full py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 transition-all",
-            isRunningTest || isFullScanning || !isConnected || !userPrompt
-              ? "bg-gray-700 text-gray-400 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20"
-          )}
+          variant="primary"
+          icon={isRunningTest ? Loader2 : Play}
+          className={isRunningTest ? "animate-pulse" : ""}
         >
-          {isRunningTest ? (
-            <>
-              <Activity className="w-5 h-5 animate-spin" /> Processing Prompt...
-            </>
-          ) : (
-            <>
-              <Play className="w-5 h-5" /> Run Autonomous Test
-            </>
-          )}
-        </button>
+          {isRunningTest ? "EXECUTING PROTOCOL..." : "INITIATE TEST SEQUENCE"}
+        </GlowButton>
 
         <div className="relative flex py-1 items-center">
-          <div className="flex-grow border-t border-gray-700"></div>
-          <span className="flex-shrink-0 mx-4 text-gray-500 text-xs uppercase tracking-wider">
-            Or
+          <div className="flex-grow border-t border-gray-200 dark:border-white/10 transition-colors duration-300"></div>
+          <span className="flex-shrink-0 mx-4 text-gray-400 dark:text-gray-600 text-[10px] uppercase tracking-widest transition-colors duration-300">
+            System Override
           </span>
-          <div className="flex-grow border-t border-gray-700"></div>
+          <div className="flex-grow border-t border-gray-200 dark:border-white/10 transition-colors duration-300"></div>
         </div>
 
-        <button
+        <GlowButton
           onClick={onFullScan}
           disabled={isRunningTest || isFullScanning || !isConnected}
-          className={clsx(
-            "w-full py-3 rounded-lg font-bold text-md flex items-center justify-center gap-2 transition-all border border-purple-500/30",
-            isRunningTest || isFullScanning || !isConnected
-              ? "bg-gray-800 text-gray-500 cursor-not-allowed"
-              : "bg-purple-900/20 hover:bg-purple-900/40 text-purple-300 hover:text-purple-200"
-          )}
+          variant="secondary"
+          icon={isFullScanning ? Loader2 : Zap}
+          className={isFullScanning ? "animate-pulse" : ""}
         >
-          {isFullScanning ? (
-            <>
-              <Activity className="w-5 h-5 animate-spin" /> Scanning Entire
-              Site...
-            </>
-          ) : (
-            <>
-              <Zap className="w-5 h-5" /> Run Full Site QA Scan
-            </>
-          )}
-        </button>
+          {isFullScanning ? "SCANNING NETWORK..." : "FULL SYSTEM AUDIT"}
+        </GlowButton>
       </div>
-    </div>
+    </GlassCard>
   );
 };
