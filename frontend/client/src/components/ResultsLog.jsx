@@ -1,35 +1,31 @@
 import React from "react";
 import { Clock, List } from "lucide-react";
 import { ResultItem } from "./ResultItem";
-import { GlassCard } from "./ui/GlassCard";
+import { Panel } from "./ui/Panel";
+import { PanelHeader } from "./ui/PanelHeader";
 import { motion, AnimatePresence } from "framer-motion";
 
 export const ResultsLog = ({ testHistory, isRunningTest }) => {
   return (
-    <GlassCard
-      className="w-full h-full p-0 flex flex-col overflow-hidden"
-      delay={0.4}
-    >
-      <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2">
-        <List className="w-4 h-4 text-gray-500" />
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-          Execution Log
-        </h2>
-        <span className="ml-auto text-xs text-gray-500 font-medium bg-gray-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
+    <Panel className="w-full h-full flex flex-col overflow-hidden">
+      <PanelHeader icon={List} title="Execution Log">
+        <span className="ml-auto text-xs text-zinc-500 font-medium bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded-full">
           {testHistory.length} Runs
         </span>
-      </div>
+      </PanelHeader>
 
       {testHistory.length === 0 && !isRunningTest ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-gray-400 dark:text-gray-600">
+        <div className="flex-1 flex flex-col items-center justify-center text-zinc-600">
           <Clock className="w-8 h-8 mb-3 opacity-20" />
-          <p className="text-sm font-medium">No test history available</p>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-sm font-medium text-zinc-500">
+            No test history available
+          </p>
+          <p className="text-xs text-zinc-600 mt-1">
             Run a test to see results here
           </p>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
           <AnimatePresence mode="popLayout">
             {testHistory.map((run) => (
               <motion.div
@@ -46,6 +42,6 @@ export const ResultsLog = ({ testHistory, isRunningTest }) => {
           </AnimatePresence>
         </div>
       )}
-    </GlassCard>
+    </Panel>
   );
 };

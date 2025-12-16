@@ -1,7 +1,6 @@
 import React from "react";
 import { PanelResizeHandle } from "react-resizable-panels";
 import clsx from "clsx";
-import { GripVertical, GripHorizontal } from "lucide-react";
 
 export const ResizeHandle = ({ className, id, orientation = "vertical" }) => {
   return (
@@ -17,10 +16,10 @@ export const ResizeHandle = ({ className, id, orientation = "vertical" }) => {
     >
       <div
         className={clsx(
-          "absolute bg-gray-200 dark:bg-gray-800 transition-all duration-200 rounded-full group-hover:bg-blue-500 group-active:bg-blue-600",
+          "absolute bg-zinc-800 transition-all duration-200 rounded-full group-hover:bg-zinc-600 group-active:bg-blue-500",
           orientation === "vertical"
-            ? "w-0.5 h-8 group-hover:h-full group-active:h-full inset-y-0 my-auto"
-            : "h-0.5 w-8 group-hover:w-full group-active:w-full inset-x-0 mx-auto"
+            ? "w-0.5 h-8 group-hover:h-12 group-active:h-12 inset-y-0 my-auto"
+            : "h-0.5 w-8 group-hover:w-12 group-active:w-12 inset-x-0 mx-auto"
         )}
       />
     </PanelResizeHandle>

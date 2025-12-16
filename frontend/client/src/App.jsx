@@ -21,7 +21,7 @@ function App() {
   } = useTestAgent();
 
   return (
-    <div className="dark flex h-screen w-full bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 font-sans overflow-hidden selection:bg-zinc-200 dark:selection:bg-zinc-800 transition-colors duration-500">
+    <div className="dark flex h-screen w-full bg-zinc-950 text-zinc-100 font-sans overflow-hidden transition-colors duration-500">
       <div className="relative z-10 w-full h-full p-2">
         <PanelGroup direction="horizontal" className="gap-2">
           {/* Sidebar Panel */}
