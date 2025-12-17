@@ -7,7 +7,7 @@ import {
   Info,
   ChevronDown,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 
 export const ResultItem = memo(({ run }) => {
@@ -21,32 +21,36 @@ export const ResultItem = memo(({ run }) => {
   // Dynamic Styles based on status
   const statusConfig = {
     fail: {
-      border: "border-red-200 dark:border-red-900/50",
-      bg: "bg-red-50/50 dark:bg-red-950/10",
+      border: "border-red-500/30",
+      bg: "bg-red-500/5",
       icon: XCircle,
-      iconColor: "text-red-500",
-      glow: "shadow-[0_0_15px_-3px_rgba(239,68,68,0.15)]",
+      iconColor: "text-red-400",
+      glow: "shadow-[0_0_15px_rgba(239,68,68,0.1)] hover:shadow-[0_0_20px_rgba(239,68,68,0.2)]",
+      accent: "bg-red-500",
     },
     pass: {
-      border: "border-green-200 dark:border-green-900/50",
-      bg: "bg-green-50/50 dark:bg-green-950/10",
+      border: "border-emerald-500/30",
+      bg: "bg-emerald-500/5",
       icon: CheckCircle2,
-      iconColor: "text-green-500",
-      glow: "shadow-[0_0_15px_-3px_rgba(34,197,94,0.15)]",
+      iconColor: "text-emerald-400",
+      glow: "shadow-[0_0_15px_rgba(16,185,129,0.1)] hover:shadow-[0_0_20px_rgba(16,185,129,0.2)]",
+      accent: "bg-emerald-500",
     },
     running: {
-      border: "border-blue-200 dark:border-blue-900/50",
-      bg: "bg-blue-50/50 dark:bg-blue-950/10",
+      border: "border-blue-500/30",
+      bg: "bg-blue-500/5",
       icon: Loader2,
-      iconColor: "text-blue-500 animate-spin",
-      glow: "shadow-[0_0_15px_-3px_rgba(59,130,246,0.15)]",
+      iconColor: "text-blue-400 animate-spin",
+      glow: "shadow-[0_0_15px_rgba(59,130,246,0.1)] hover:shadow-[0_0_20px_rgba(59,130,246,0.2)]",
+      accent: "bg-blue-500",
     },
     info: {
-      border: "border-gray-200 dark:border-zinc-800",
-      bg: "bg-white dark:bg-zinc-900",
+      border: "border-slate-700/50",
+      bg: "bg-slate-800/20",
       icon: Info,
-      iconColor: "text-gray-400",
-      glow: "shadow-sm",
+      iconColor: "text-slate-400",
+      glow: "shadow-none hover:bg-slate-800/30",
+      accent: "bg-slate-500",
     },
   };
 
@@ -65,24 +69,17 @@ export const ResultItem = memo(({ run }) => {
       layout
       onClick={() => setIsExpanded(!isExpanded)}
       className={clsx(
-        "relative overflow-hidden rounded-xl border transition-all duration-300 group cursor-pointer",
+        "relative overflow-hidden rounded-xl border transition-all duration-300 group cursor-pointer backdrop-blur-sm",
         config.border,
         config.bg,
-        config.glow,
-        "hover:shadow-md dark:hover:shadow-none"
+        config.glow
       )}
     >
-      {/* Decorative Side Bar */}
+      {/* Decorative Side Bar with Glow */}
       <div
         className={clsx(
-          "absolute left-0 top-0 bottom-0 w-1",
-          isFail
-            ? "bg-red-500"
-            : isRunning
-            ? "bg-blue-500"
-            : isInfo
-            ? "bg-gray-300"
-            : "bg-green-500"
+          "absolute left-0 top-0 bottom-0 w-1 shadow-[0_0_8px_currentColor]",
+          config.accent
         )}
       />
 
@@ -91,19 +88,19 @@ export const ResultItem = memo(({ run }) => {
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <StatusIcon className={clsx("w-4 h-4", config.iconColor)} />
-            <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
               {run.title || "System Event"}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono text-gray-400">
+            <span className="text-[10px] font-mono text-slate-500">
               {run.timestamp}
             </span>
             <motion.div
               animate={{ rotate: isExpanded ? 180 : 0 }}
               transition={{ duration: 0.2 }}
             >
-              <ChevronDown className="w-3 h-3 text-gray-400" />
+              <ChevronDown className="w-3 h-3 text-slate-500" />
             </motion.div>
           </div>
         </div>
@@ -112,7 +109,7 @@ export const ResultItem = memo(({ run }) => {
         <div className="space-y-2">
           {run.steps.map((step) => (
             <div key={step.id} className="flex flex-col gap-1">
-              <div className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-200">
+              <div className="flex items-start gap-2 text-sm text-slate-300">
                 <span className="leading-relaxed font-medium break-words">
                   {step.stepName}
                 </span>
@@ -122,7 +119,7 @@ export const ResultItem = memo(({ run }) => {
                 <motion.div
                   layout
                   className={clsx(
-                    "ml-0 text-xs text-gray-300 bg-zinc-950/50 p-2 rounded border border-white/5 font-mono break-all overflow-hidden",
+                    "ml-0 text-xs text-slate-400 bg-black/40 p-2 rounded border border-white/5 font-mono break-all overflow-hidden",
                     !isExpanded && "line-clamp-2"
                   )}
                 >
@@ -133,8 +130,8 @@ export const ResultItem = memo(({ run }) => {
               )}
 
               {step.errorMessage && (
-                <div className="mt-1 flex items-start gap-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded break-words">
-                  <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                <div className="mt-1 flex items-start gap-2 text-xs text-red-300 bg-red-500/10 p-2 rounded break-words border border-red-500/20">
+                  <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-red-400" />
                   <span>{step.errorMessage}</span>
                 </div>
               )}

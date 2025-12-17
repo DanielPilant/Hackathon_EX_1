@@ -34,7 +34,9 @@ export const useTestAgent = () => {
     // כשמתקבלת הודעה מהשרת (לוגים של MCP)
     ws.onmessage = (event) => {
       try {
+        console.log("🔥 RAW WS MESSAGE:", event.data); // <--- Junction B: Raw Log
         const msg = JSON.parse(event.data);
+        console.log("🧩 PARSED TYPE:", msg.type); // <--- Junction B: Parsed Type
 
         // -------------------------------------------
         // 1. Handle Failure Analysis (The Good Stuff)
@@ -97,6 +99,7 @@ export const useTestAgent = () => {
           ],
         };
 
+        console.log("✅ Adding to State:", newEntry); // <--- Junction B: State Update Log
         logBufferRef.current.push(newEntry);
       } catch {
         console.log("Received raw message:", event.data);

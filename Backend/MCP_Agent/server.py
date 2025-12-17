@@ -57,6 +57,7 @@ Rules:
 - Use stable selectors (roles, labels, visible text).
 - Keep tool outputs small: do NOT request full page snapshots/DOM dumps.
   When checking page state, only read URL + title + 1-2 key elements.
+- IMPORTANT: Always set the viewport size to 1920x1080 for high-definition screenshots.
 
 Behavior:
 - Work step by step and verify each action.
@@ -233,7 +234,9 @@ async def process_and_send_log(websocket: WebSocket, payload: Dict[str, Any]):
     
     # אם לא ניתחנו, שולחים רגיל
     try:
-        pass
+        print(f"📤 SENDING WS PAYLOAD: {payload}")  # <--- Junction A: Debug Print
+        await websocket.send_json(payload)
+        print(f"✅ WS SENT SUCCESS")  # <--- Junction A: Confirmation
     except Exception as e:
         print(f"⚠️ Failed to send log via WS: {e}")
 def _assert_domain(url: str, allowed_domain: str):
