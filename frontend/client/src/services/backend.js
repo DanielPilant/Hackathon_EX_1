@@ -2,7 +2,7 @@ import axios from "axios";
 
 const API_BASE_URL = "http://localhost:8000";
 
-export const apiService = {
+export const backend = {
   // 1. Create Session
   createSession: async (url, allowedDomain) => {
     try {
@@ -12,7 +12,7 @@ export const apiService = {
       });
       return response.data; // Returns { session_id, snapshot }
     } catch (error) {
-      console.error("Create session failed:", error);
+      console.error("Backend: Create session failed:", error);
       throw error;
     }
   },
@@ -29,7 +29,7 @@ export const apiService = {
       );
       return response.data; // Returns { ok, output, snapshot }
     } catch (error) {
-      console.error("Send prompt failed:", error);
+      console.error("Backend: Send prompt failed:", error);
       throw error;
     }
   },

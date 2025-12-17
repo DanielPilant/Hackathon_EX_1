@@ -13,6 +13,23 @@ from pydantic import BaseModel, Field
 from agents import Agent, Runner
 from agents.mcp import MCPServerStreamableHttp
 from openai import RateLimitError
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI(title="Playwright Agent Server", version="1.0")
+
+# --- הוספת CORS ---
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # Allow both localhost and IP
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 load_dotenv()
 
@@ -140,8 +157,6 @@ SESSIONS: Dict[str, Session] = {}
 MCP_SERVER: Optional[MCPServerStreamableHttp] = None
 
 # FastAPI with lifespan startup/shutdown
-app = FastAPI(title="Playwright Agent Server", version="1.0")
-
 
 @app.on_event("startup")
 async def startup():

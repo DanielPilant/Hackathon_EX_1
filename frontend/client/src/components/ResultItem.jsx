@@ -7,7 +7,6 @@ import {
   AlertCircle,
 } from "lucide-react";
 import clsx from "clsx";
-import { motion } from "framer-motion";
 
 export const ResultItem = ({ run }) => {
   return (
