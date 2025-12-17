@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Monitor, Play, Signal, WifiOff } from "lucide-react";
+import { Monitor, Signal, WifiOff } from "lucide-react";
 import { GlassCard } from "./ui/GlassCard";
 import clsx from "clsx";
 
@@ -8,8 +8,9 @@ export const VideoPlayer = ({ sessionId }) => {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    // אין סשן => לא מתחברים
-    if (!sessionId) {
+    // חייב להיות uuid hex באורך 32 (uuid.uuid4().hex)
+    const validSession = /^[a-f0-9]{32}$/i.test(sessionId ?? "");
+    if (!validSession) {
       setConnected(false);
       setSrc("");
       return;
@@ -27,16 +28,25 @@ export const VideoPlayer = ({ sessionId }) => {
       try {
         const ev = JSON.parse(e.data);
 
-        if (ev?.type === "frame" && ev?.frame) {
-          // כי זה כבר data URL מלא
-          setSrc(ev.frame);
+        if (ev?.type === "frame") {
+          // Format A: server sends full data URL in "frame"
+          if (ev.frame) {
+            setSrc(ev.frame);
+            return;
+          }
+
+          // Format B: server sends { mime, data(base64) }
+          if (ev.mime && ev.data) {
+            setSrc(`data:${ev.mime};base64,${ev.data}`);
+            return;
+          }
         }
       } catch {
         console.error("VideoPlayer: Failed to parse WS message", e.data);
       }
     };
 
-    // keep-alive קטן כדי שהשרת (שקורא receive_text) יקבל משהו מדי פעם
+    // keep-alive קטן כדי שהשרת יקבל משהו מדי פעם
     const heartbeat = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) ws.send("ping");
     }, 15000);
@@ -101,9 +111,7 @@ export const VideoPlayer = ({ sessionId }) => {
               {sessionId ? "Establishing Uplink..." : "No Active Feed"}
             </p>
             <p className="text-xs text-slate-600 mt-1 font-mono">
-              {sessionId
-                ? "Waiting for frame data"
-                : "Initiate session to view"}
+              {sessionId ? "Waiting for frame data" : "Initiate session to view"}
             </p>
           </div>
         )}

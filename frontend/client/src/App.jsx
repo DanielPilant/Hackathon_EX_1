@@ -10,6 +10,7 @@ import { AnimatePresence } from "framer-motion";
 
 function App() {
   const {
+    sessionId,
     userId,
     testHistory,
     isScanning,
@@ -61,7 +62,7 @@ function App() {
               {/* Panel B1: Visual Feed */}
               <Panel defaultSize={65} minSize={30} className="flex flex-col h-full overflow-hidden p-4 pl-2 pb-2">
                 <div className="relative flex-1 min-h-0 w-full h-full">
-                  <VideoPlayer sessionId={userId} />
+                    <VideoPlayer sessionId={sessionId} />
                   <AnimatePresence>
                     {(isRunningTest || isScanning) && <ExecutionLoader />}
                   </AnimatePresence>

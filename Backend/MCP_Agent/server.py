@@ -24,6 +24,9 @@ from failure_analyzer import FailureAnalyzer, is_failure_event
 
 app = FastAPI(title="Playwright Agent Server", version="1.0")
 
+DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5-mini")  # או gpt-4.1-mini
+print("✅ DEFAULT_MODEL =", DEFAULT_MODEL)
+
 # --- הוספת CORS ---
 origins = [
     "http://localhost:5173",
@@ -110,7 +113,6 @@ async def run_with_tpm_fallback(agent: Agent, user_prompt: str, max_attempts: in
                 continue
             if _is_request_too_large(msg):
                 prompt = _shrink_prompt(prompt, keep_chars=600)
-                os.environ["OPENAI_MODEL"] = "gpt-4o-mini"
                 await asyncio.sleep(1.0)
                 continue
             await asyncio.sleep(min(2 ** attempt, 10))
@@ -446,13 +448,14 @@ def _assert_domain(url: str, allowed_domain: str):
 def _build_agent(allowed_domain: str) -> Agent:
     if MCP_SERVER is None:
         raise RuntimeError("MCP server not initialized")
-    # Domain restriction is enforced primarily by instructions + your own checks.
-    # You can also add more hard checks in prompts.
+
     return Agent(
         name="UI Test Runner",
         instructions=INSTRUCTIONS + f"\n\nHard rule: Stay only on domain: {allowed_domain}",
         mcp_servers=[MCP_SERVER],
+        model=DEFAULT_MODEL,  # ✅ פה אתה נועל את המודל ל-Runner
     )
+
 
 
 def _compose_prompt(session: Session, user_prompt: str) -> str:
@@ -869,7 +872,7 @@ async def suggest_test(session_id: str):
     try:
         client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
         response = await client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=DEFAULT_MODEL,
             messages=[
                 {"role": "system", "content": """You are a QA Lead. Suggest the NEXT logical test step for a Playwright automation agent.
 CRITICAL RULES:
