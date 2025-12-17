@@ -550,13 +550,21 @@ async def suggest_test(session_id: str):
         context += f"\nPage Title: {session.last_snapshot.get('title')}"
         context += f"\nVisible Elements: {session.last_snapshot.get('keys')}"
     
+    # 1. Extract History (Last 5 actions)
+    recent_history = session.history[-5:] if session.history else []
+    history_text = "\n".join([f"- {h}" for h in recent_history]) if recent_history else "None"
+
     try:
         client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a QA Lead. Based on the provided page context (URL/DOM snapshot), suggest ONE concise, actionable test prompt for a Playwright automation agent. Output ONLY the prompt text. Do not include quotes or explanations."},
-                {"role": "user", "content": f"Context: {context}"}
+                {"role": "system", "content": """You are a QA Lead. Suggest the NEXT logical test step for a Playwright automation agent.
+CRITICAL RULES:
+1. Look at the `RECENT_ACTIONS`. **DO NOT** repeat a suggestion that was just made.
+2. If the main path (e.g., Login) was just attempted, suggest a **Negative Test** (invalid input), a **Secondary Action** (Forgot Password, links), or **Navigation** (Go Back, Home).
+3. Output ONLY the prompt text. Do not include quotes or explanations."""},
+                {"role": "user", "content": f"Context: {context}\n\nRECENT_ACTIONS:\n{history_text}"}
             ],
             max_tokens=60,
             temperature=0.7
