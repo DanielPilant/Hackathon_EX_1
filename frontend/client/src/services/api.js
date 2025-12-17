@@ -1,114 +1,66 @@
 import axios from "axios";
-import { MOCK_TEST_RESULTS, MOCK_FULL_SCAN_RESULTS } from "../data/mockData";
 
-const USE_MOCK = true;
-const API_BASE_URL = "http://localhost:8000/api"; // Placeholder for future backend
-
-const simulateDelay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const API_BASE_URL = "http://localhost:8000"; // כתובת השרת החדש
 
 export const apiService = {
-  /**
-   * Sets the target URL for the test session.
-   * @param {string} url
-   * @param {string} userId
-   * @returns {Promise<{status: string, message: string}>}
-   */
-  setTargetUrl: async (url, userId) => {
-    // Construct the exact payload expected by the backend
-    const payload = {
-      user_id: userId,
-      url: url,
-    };
-
-    if (USE_MOCK) {
-      console.log(
-        "🚀 [Payload] setTargetUrl:",
-        JSON.stringify(payload, null, 2)
-      );
-      await simulateDelay(2000);
+  // 1. יצירת סשן חדש (במקום setTargetUrl)
+  connectToUrl: async (url, allowedDomain = "savingplan.web.app") => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/sessions`, {
+        start_url: url,
+        allowed_domain: allowedDomain,
+      });
+      // השרת מחזיר session_id, אנחנו צריכים לשמור אותו
       return {
         status: "success",
-        message: "Target scanned and loaded into memory",
+        sessionId: response.data.session_id,
+        snapshot: response.data.snapshot,
       };
-    } else {
-      const response = await axios.post(`${API_BASE_URL}/target`, payload);
-      return response.data;
+    } catch (error) {
+      console.error("Connection failed:", error);
+      throw error;
     }
   },
 
-  /**
-   * Sends the user prompt to the AI agent and retrieves test results.
-   * @param {string} prompt
-   * @param {string} userId
-   * @returns {Promise<{status: string, title: string, results: Array}>}
-   */
-  sendPrompt: async (prompt, userId) => {
-    // Construct the exact payload expected by the backend
-    const payload = {
-      user_id: userId,
-      prompt: prompt,
-    };
-
-    if (USE_MOCK) {
-      console.log("🚀 [Payload] sendPrompt:", JSON.stringify(payload, null, 2));
-      await simulateDelay(3000);
-
-      // Mock Title Generation Logic (Simulating LLM summarization)
-      let title = "Ad-hoc User Test";
-      const p = prompt.toLowerCase();
-      if (p.includes("login") || p.includes("sign in")) {
-        title = "Login Validation - Negative Flow";
-      } else if (p.includes("cart") || p.includes("checkout")) {
-        title = "E-commerce Checkout Flow";
-      } else if (p.includes("search")) {
-        title = "Search Functionality Verification";
-      } else if (p.includes("form") || p.includes("contact")) {
-        title = "Form Submission Test";
-      } else if (p.length > 0) {
-        // Capitalize first letter and truncate
-        title =
-          prompt.charAt(0).toUpperCase() +
-          prompt.slice(1, 25) +
-          (prompt.length > 25 ? "..." : "");
-      }
-
-      return {
-        status: "completed",
-        title: title,
-        results: MOCK_TEST_RESULTS,
-      };
-    } else {
-      const response = await axios.post(`${API_BASE_URL}/generate`, payload);
-      return response.data;
-    }
-  },
-
-  /**
-   * Triggers a full autonomous site scan.
-   * @param {string} userId
-   * @returns {Promise<{status: string, title: string, results: Array}>}
-   */
-  runFullSiteScan: async (userId) => {
-    // Construct the exact payload expected by the backend
-    const payload = {
-      user_id: userId,
-      action: "full_scan",
-    };
-
-    if (USE_MOCK) {
-      console.log(
-        "🚀 [Payload] runFullSiteScan:",
-        JSON.stringify(payload, null, 2)
+  // 2. שליחת פרומפט (במקום sendPrompt)
+  runPrompt: async (prompt, sessionId) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/sessions/${sessionId}/prompt`,
+        {
+          prompt: prompt,
+          max_attempts: 4,
+        }
       );
-      await simulateDelay(3000);
+
+      // המרת התשובה הטקסטואלית של ה-Agent למבנה שהפרונט מכיר
+      // (בשרת הנוכחי הוא מחזיר טקסט ולא JSON של צעדים, אז אנחנו עוטפים אותו)
       return {
         status: "completed",
-        title: "Autonomous Full Site Audit",
-        results: MOCK_FULL_SCAN_RESULTS,
+        results: [
+          {
+            id: Date.now(),
+            stepName: "AI Execution Report",
+            status: "pass", // מניחים הצלחה אם ה-HTTP עבר
+            description: response.data.output, // הטקסט שה-AI כתב
+            timestamp: new Date().toLocaleTimeString(),
+          },
+        ],
       };
-    } else {
-      const response = await axios.post(`${API_BASE_URL}/scan`, payload);
-      return response.data;
+    } catch (error) {
+      console.error("Prompt failed:", error);
+      return {
+        status: "failed",
+        results: [
+          {
+            id: Date.now(),
+            stepName: "System Error",
+            status: "fail",
+            description: error.message,
+            timestamp: new Date().toLocaleTimeString(),
+          },
+        ],
+      };
     }
   },
 };
