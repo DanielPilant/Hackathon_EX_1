@@ -121,6 +121,13 @@ async def run_with_tpm_fallback(agent: Agent, user_prompt: str, max_attempts: in
 # API models
 # ---------------------------
 
+# Represents a single test scenario suggested by the AI after analyzing the page
+class TestSuggestion(BaseModel):
+    id: str = Field(..., description="Unique identifier for the suggestion")
+    title: str = Field(..., description="Short, descriptive title of the test")
+    description: str = Field(..., description="Full explanation of what the test will verify")
+
+
 class CreateSessionRequest(BaseModel):
     start_url: str = Field(..., description="Initial URL to open (must be same domain you allow).")
     allowed_domain: str = Field("savingplan.web.app", description="Allowed domain for this session.")
@@ -128,6 +135,7 @@ class CreateSessionRequest(BaseModel):
 class CreateSessionResponse(BaseModel):
     session_id: str
     snapshot: Optional[dict] = None
+    suggestions: Optional[List[TestSuggestion]] = []
 
 class PromptRequest(BaseModel):
     prompt: str
@@ -489,6 +497,72 @@ def _extract_state_block(output: str) -> Optional[dict]:
     if not m:
         return None
     return {"url": m.group(1).strip(), "title": m.group(2).strip(), "keys": m.group(3).strip()}
+
+
+# NEW/STAY: Shared utility function that can be called from multiple endpoints
+async def _generate_page_suggestions(session: Session) -> List[dict]:
+    analysis_prompt = """
+        You are a senior QA engineer analyzing the CURRENT VIEW of a live web page via Playwright.
+
+        MISSION:
+        Generate 5-10 high-impact test ideas that target REAL RISKS visible on this specific page.
+        Prioritize tests that would catch regressions, security issues, broken flows, or critical UX failures.
+
+        HARD CONSTRAINTS:
+        1. Analyze ONLY what's visible/interactive RIGHT NOW (no assumptions about other pages)
+        2. Each test MUST reference a specific element on THIS page (button name, form field, nav link, modal, table, banner, CTA, etc.)
+        3. NO step-by-step instructions - provide test concepts only
+        4. NO implementation details (Playwright, selectors, code)
+        5. Avoid generic tests ("page loads") unless tied to a critical page-specific indicator
+
+        COVERAGE MATRIX (use what exists on the page):
+        ✓ Critical user flows (primary CTA, main conversion path)
+        ✓ Form validation (required fields, format rules, boundary cases, empty submit)
+        ✓ Authentication/Authorization signals (login gates, role-based visibility, session timeout indicators)
+        ✓ Navigation integrity (menu links, breadcrumbs, back/forward, deep links)
+        ✓ Error handling (invalid input, 404 states, empty results, disabled actions)
+        ✓ Async content (loading states, race conditions, stale data)
+        ✓ Security vectors (XSS inputs, CSRF tokens if forms exist, rate limiting hints, unsafe redirects)
+        ✓ Accessibility (keyboard navigation, focus traps, ARIA labels, color contrast issues)
+        ✓ Layout/Responsive integrity (overlapping elements, clipped CTAs, mobile breakpoints if testable)
+        ✓ Data correctness (prices, dates, totals, counts, status indicators)
+
+        QUALITY BAR:
+        - Each test must target a DISTINCT risk
+        - Prefer tests that validate user value over technical minutiae
+        - If the page is complex → aim for 10 tests covering breadth
+        - If the page is simple → 5-7 focused tests on depth (edge cases, accessibility, validation)
+        - Balance: 40% happy path + 30% validation/errors + 30% security/accessibility
+
+        OUTPUT FORMAT (STRICT JSON):
+        [
+        {
+            "id": "descriptive-slug-format",
+            "title": "Concise test name (≤70 chars)",
+            "description": "1-3 sentences. Must mention the specific visible element(s) being tested and why it matters. Explain the risk/value clearly."
+        }
+        ]
+
+        RULES:
+        - Return ONLY valid JSON (no markdown, no code fences, no commentary)
+        - "id" format: lowercase-with-hyphens (e.g., "signup-empty-email-validation")
+        - "title" max 70 characters
+        - "description" must reference at least ONE concrete element from the current view
+
+        Now analyze the page and generate the JSON array.
+        """.strip()
+    try:
+        run = await run_with_tpm_fallback(session.agent, analysis_prompt)
+        content = run.final_output.strip()
+        match = re.search(r"(\[.*\])", content, re.DOTALL)
+        if match:
+            return json.loads(match.group(1))
+    except Exception as e:
+        print(f"Discovery error: {e}")
+    return []
+
+
+
 # ---------------------------
 
 FRAME_FPS = 20
@@ -612,16 +686,18 @@ async def create_session(req: CreateSessionRequest):
         f"End with STATE."
     )
 
+    suggestions_data = []
+
     async with s.lock:
         s.last_used_at = time.time()
         run = await run_with_tpm_fallback(s.agent, _compose_prompt(s, init_prompt), max_attempts=4)
         out = (run.final_output or "").strip()
         s.history.append(out[:1200])
-        snap = _extract_state_block(out)
-        s.last_snapshot = snap
+        s.last_snapshot = _extract_state_block(out)
+        suggestions_data = await _generate_page_suggestions(s)
 
-    return CreateSessionResponse(session_id=session_id, snapshot=s.last_snapshot)
- 
+    return CreateSessionResponse(session_id=session_id, snapshot=s.last_snapshot, suggestions=suggestions_data)
+
 
 @app.post("/sessions/{session_id}/prompt", response_model=PromptResponse)
 async def send_prompt(session_id: str, req: PromptRequest):
@@ -825,6 +901,17 @@ async def get_session(session_id: str):
         history_len=len(s.history),
     )
 
+@app.get("/sessions/{session_id}/suggestions", response_model=List[TestSuggestion])
+async def get_manual_suggestions(session_id: str):
+    s = SESSIONS.get(session_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    async with s.lock:
+        s.last_used_at = time.time()
+        # Call the shared utility function
+        return await _generate_page_suggestions(s)
+
 
 @app.delete("/sessions/{session_id}")
 async def close_session(session_id: str):
@@ -834,6 +921,8 @@ async def close_session(session_id: str):
     # Note: closing actual browser/page depends on MCP tool support.
     # For now we just drop the session reference.
     return {"ok": True, "session_id": session_id}
+
+
 
 
 @app.websocket("/ws/sessions/{session_id}")
