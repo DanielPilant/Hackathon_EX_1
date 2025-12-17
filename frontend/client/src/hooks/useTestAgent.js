@@ -51,12 +51,23 @@ export const useTestAgent = () => {
     }
 
     setIsRunningTest(true);
+    const startTime = Date.now();
+
     try {
       console.log("Hook: Sending prompt:", prompt);
       const data = await backend.sendPrompt(prompt, sessionId);
 
       // Backend returns { ok, output }, not { results }
       if (data.ok) {
+        const output = data.output || "";
+        const isFail = output.toUpperCase().includes("FAIL");
+        const status = isFail ? "fail" : "pass";
+
+        // Clean up output: Remove "STATE:" block and trim
+        const cleanOutput = output.split(/STATE:/i)[0].trim();
+
+        const duration = ((Date.now() - startTime) / 1000).toFixed(1) + "s";
+
         const newRun = {
           id: Date.now(),
           title: prompt.length > 30 ? prompt.substring(0, 30) + "..." : prompt,
@@ -64,11 +75,11 @@ export const useTestAgent = () => {
           steps: [
             {
               id: Date.now(),
-              stepName: "AI Response",
-              status: "pass",
-              description: data.output,
+              stepName: isFail ? "Action Failed" : cleanOutput || "Action Completed",
+              status: status,
+              errorMessage: isFail ? cleanOutput : undefined,
               timestamp: new Date().toLocaleTimeString(),
-              duration: "2s",
+              duration: duration,
             },
           ],
         };
@@ -79,7 +90,27 @@ export const useTestAgent = () => {
       console.error("Prompt Error:", error);
       const errorMsg =
         error.response?.data?.detail || error.message || "Unknown error";
-      alert(`Test Failed: ${errorMsg}`);
+      
+      // Add a failed run to history so user sees it in the log
+      const newRun = {
+        id: Date.now(),
+        title: prompt.length > 30 ? prompt.substring(0, 30) + "..." : prompt,
+        timestamp: new Date().toLocaleString(),
+        steps: [
+          {
+            id: Date.now(),
+            stepName: "System Error",
+            status: "fail",
+            errorMessage: errorMsg,
+            timestamp: new Date().toLocaleTimeString(),
+            duration: "0s",
+          },
+        ],
+      };
+      setTestHistory((prev) => [newRun, ...prev]);
+      
+      // Optional: still alert if critical
+      // alert(`Test Failed: ${errorMsg}`);
     } finally {
       setIsRunningTest(false);
     }
