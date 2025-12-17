@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { backend } from "../services/backend";
 
 export const useTestAgent = () => {
@@ -8,6 +8,79 @@ export const useTestAgent = () => {
   const [isRunningTest, setIsRunningTest] = useState(false);
   const [isFullScanning, setIsFullScanning] = useState(false);
   const [testHistory, setTestHistory] = useState([]);
+
+  // -------------------------------------------
+  // הוספת ה-WebSocket Listener
+  // -------------------------------------------
+  useEffect(() => {
+    // אם אין סשן, אין לאן להתחבר
+    if (!sessionId) return;
+
+    console.log(`🔌 Opening WebSocket for session: ${sessionId}`);
+
+    // יצירת החיבור
+    const ws = new WebSocket(`ws://localhost:8000/ws/sessions/${sessionId}`);
+
+    // כשהחיבור נפתח
+    ws.onopen = () => {
+      console.log("✅ WS Connected!");
+      // אופציונלי: שליחת פינג ראשוני
+      // ws.send("ping");
+    };
+
+    // כשמתקבלת הודעה מהשרת (לוגים של MCP)
+    ws.onmessage = (event) => {
+      try {
+        const logData = JSON.parse(event.data);
+        console.log("🚀 [MCP LOG]:", logData);
+
+        // Extract message content
+        const message =
+          logData.message || logData.content || JSON.stringify(logData);
+
+        // Smart Status Detection
+        let status = "info";
+        if (/pass|success/i.test(message)) status = "pass";
+        else if (/fail|error|exception/i.test(message)) status = "fail";
+        else if (/processing|running|start/i.test(message)) status = "running";
+
+        // Create new history entry
+        const newEntry = {
+          id: Date.now() + Math.random(), // Ensure unique ID
+          title: "System Event",
+          timestamp: new Date().toLocaleString(),
+          isLog: true, // Flag to distinguish from user prompts if needed
+          steps: [
+            {
+              id: Date.now(),
+              stepName: message,
+              status: status,
+              description: logData.details || "",
+              timestamp: new Date().toLocaleTimeString(),
+              duration: "0.1s",
+            },
+          ],
+        };
+
+        setTestHistory((prev) => [newEntry, ...prev]);
+      } catch {
+        console.log("Received raw message:", event.data);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error("❌ WS Error:", error);
+    };
+
+    ws.onclose = () => {
+      console.log("🔌 WS Disconnected");
+    };
+
+    // Cleanup: סגירת החיבור כשהקומפוננטה יורדת או כשהסשן מתחלף
+    return () => {
+      ws.close();
+    };
+  }, [sessionId]); // <--- הפונקציה תרוץ מחדש רק כשה-sessionId משתנה
 
   // User ID for display only (Sidebar)
   const userId = sessionId || "Not Connected";
