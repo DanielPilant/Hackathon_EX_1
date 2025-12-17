@@ -4,6 +4,7 @@ import re
 import sys
 import time
 import uuid
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -215,6 +216,67 @@ def format_live_step(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     # We only care about tool calls or specific events
     event_type = payload.get("type", "")
+    
+    # --- NEW: Structured Data Extraction ---
+    tool_name = payload.get("tool")
+    tool_args = payload.get("args") or {}
+    
+    if tool_name:
+        name = str(tool_name).lower()
+        
+        if "goto" in name or "navigat" in name:
+            url = tool_args.get("url") or tool_args.get("link") or "target page"
+            return {
+                "type": "execution_step",
+                "data": {
+                    "icon": "🌐",
+                    "action": "Navigating",
+                    "details": f"to {url}",
+                    "timestamp": time.strftime("%H:%M:%S"),
+                    "status": "info"
+                }
+            }
+        
+        if "click" in name:
+            selector = tool_args.get("selector") or "element"
+            return {
+                "type": "execution_step",
+                "data": {
+                    "icon": "🖱️",
+                    "action": "Clicking",
+                    "details": selector,
+                    "timestamp": time.strftime("%H:%M:%S"),
+                    "status": "info"
+                }
+            }
+            
+        if "fill" in name or "type" in name:
+            selector = tool_args.get("selector") or "input"
+            value = tool_args.get("value") or tool_args.get("text") or "text"
+            return {
+                "type": "execution_step",
+                "data": {
+                    "icon": "⌨️",
+                    "action": "Typing",
+                    "details": f"'{value}' into {selector}",
+                    "timestamp": time.strftime("%H:%M:%S"),
+                    "status": "info"
+                }
+            }
+            
+        if "screenshot" in name:
+             return {
+                "type": "execution_step",
+                "data": {
+                    "icon": "📸",
+                    "action": "Capturing",
+                    "details": "visual state",
+                    "timestamp": time.strftime("%H:%M:%S"),
+                    "status": "info"
+                }
+            }
+
+    # --- Fallback to String Parsing (Existing Logic) ---
     data = str(payload.get("data", ""))
     data_lower = data.lower()
 
@@ -238,8 +300,14 @@ def format_live_step(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if "click" in data_lower:
         # Try to extract selector
         selector = "element"
-        if "selector=" in data:
-            selector = data.split("selector=")[1].split(" ")[0]
+        
+        # Regex for selector='...' or selector="..."
+        match = re.search(r"(?:selector|element)=['\"]([^'\"]+)['\"]", data)
+        if match:
+            selector = match.group(1)
+        elif "selector=" in data:
+            try: selector = data.split("selector=")[1].split(" ")[0]
+            except: pass
         elif "'" in data:
              parts = data.split("'")
              if len(parts) > 1:
@@ -258,12 +326,25 @@ def format_live_step(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
     # 3. Typing / Filling
     if "fill" in data_lower or "type" in data_lower:
+        selector = "input"
+        value = "text"
+        
+        # Extract selector
+        sel_match = re.search(r"(?:selector|element)=['\"]([^'\"]+)['\"]", data)
+        if sel_match:
+            selector = sel_match.group(1)
+            
+        # Extract value
+        val_match = re.search(r"(?:value|text)=['\"]([^'\"]+)['\"]", data)
+        if val_match:
+            value = val_match.group(1)
+            
         return {
             "type": "execution_step",
             "data": {
                 "icon": "⌨️",
                 "action": "Typing",
-                "details": "input data...",
+                "details": f"'{value}' into {selector}",
                 "timestamp": time.strftime("%H:%M:%S"),
                 "status": "info"
             }
@@ -564,13 +645,57 @@ async def send_prompt(session_id: str, req: PromptRequest):
             collected_events = []  # Collect events for potential failure analysis
 
             async for event in run.stream_events():
+                # Initialize payload with defaults
                 payload = {
                     "type": event.type,
-                    "data": None,
+                    "data": "Analyzing...", # Default friendly message
+                    "tool": None,
+                    "args": None
                 }
 
-                if hasattr(event, "item") and event.item:
-                    payload["data"] = str(event.item)
+                item = getattr(event, "item", None)
+                if item:
+                    # 1. Check for Tool Calls (Direct or Nested)
+                    # Some agents wrap tool calls in 'tool_calls' list, others emit ToolCall event directly
+                    tool_calls = getattr(item, "tool_calls", None)
+                    
+                    if tool_calls and isinstance(tool_calls, list) and len(tool_calls) > 0:
+                        # Extract first tool call
+                        tc = tool_calls[0]
+                        # Try to get name/args from various common structures
+                        t_name = getattr(tc, "tool_name", None) or getattr(tc, "function", None)
+                        if hasattr(t_name, "name"): t_name = t_name.name # Handle Function object
+                        
+                        t_args = getattr(tc, "tool_kwargs", None) or getattr(tc, "arguments", None)
+                        if isinstance(t_args, str): 
+                            try: t_args = json.loads(t_args)
+                            except: pass
+                        
+                        payload["type"] = "tool_call"
+                        payload["tool"] = t_name
+                        payload["args"] = t_args
+                        payload["data"] = f"Tool: {t_name}"
+
+                    elif hasattr(item, "tool_name") and hasattr(item, "tool_kwargs"):
+                        # Direct ToolCall object
+                        payload["type"] = "tool_call"
+                        payload["tool"] = item.tool_name
+                        payload["args"] = item.tool_kwargs
+                        payload["data"] = f"Tool: {item.tool_name}"
+
+                    # 2. Check for Text Content (Thoughts/Response)
+                    elif hasattr(item, "text") and item.text:
+                        payload["data"] = item.text
+                    elif hasattr(item, "content") and item.content:
+                        payload["data"] = str(item.content)
+                    elif hasattr(item, "delta") and item.delta:
+                        payload["data"] = str(item.delta)
+                    
+                    # 3. Fallback
+                    else:
+                        s_item = str(item)
+                        if s_item and s_item != "None":
+                            payload["data"] = s_item
 
                 # Collect event for failure analysis
                 collected_events.append(payload)
