@@ -42,6 +42,12 @@ export const useTestAgent = () => {
         if (msg.type === "failure_analysis") {
           const analysis = msg.data;
 
+          // FILTER: Skip low-quality "UNKNOWN" analyses
+          if (analysis.failure_category === "UNKNOWN") {
+            console.debug("Skipped UNKNOWN failure analysis");
+            return;
+          }
+
           const newEntry = {
             id: Date.now() + Math.random(),
             type: "failure_card", // Custom type for rendering
