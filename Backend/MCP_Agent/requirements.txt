@@ -3,3 +3,6 @@ playwright
 python-dotenv
 google-generativeai
 pydantic
+fastapi 
+uvicorn 
+python-dotenv
