@@ -1,5 +1,13 @@
 import React, { useState, useMemo } from "react";
-import { Clock, List, AlertTriangle, Lightbulb, Terminal, CheckCircle, Filter } from "lucide-react";
+import {
+  Clock,
+  List,
+  AlertTriangle,
+  Lightbulb,
+  Terminal,
+  CheckCircle,
+  Filter,
+} from "lucide-react";
 import { ResultItem } from "./ResultItem";
 import { GlassCard } from "./ui/GlassCard";
 import { AnimatePresence, motion } from "framer-motion";
