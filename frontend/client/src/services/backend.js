@@ -33,4 +33,17 @@ export const backend = {
       throw error;
     }
   },
+
+  // 3. Get Suggestion
+  getSuggestion: async (sessionId) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/sessions/${sessionId}/suggest`
+      );
+      return response.data; // Returns { suggestion: "..." }
+    } catch (error) {
+      console.error("Backend: Get suggestion failed:", error);
+      throw error;
+    }
+  },
 };

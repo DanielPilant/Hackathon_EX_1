@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from agents import Agent, Runner
 from agents.mcp import MCPServerStreamableHttp
-from openai import RateLimitError
+from openai import RateLimitError, AsyncOpenAI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Add parent directory to path for failure_analyzer import
@@ -57,6 +57,7 @@ Rules:
 - Use stable selectors (roles, labels, visible text).
 - Keep tool outputs small: do NOT request full page snapshots/DOM dumps.
   When checking page state, only read URL + title + 1-2 key elements.
+- IMPORTANT: Always set the viewport size to 1920x1080 for high-definition screenshots.
 
 Behavior:
 - Work step by step and verify each action.
@@ -162,6 +163,9 @@ class Session:
     last_snapshot: Optional[dict] = None
     ws: Optional[WebSocket] = None
 
+    frame_sockets: List[WebSocket] = field(default_factory=list)
+    frame_task: Optional[asyncio.Task] = None
+
 
 
 SESSIONS: Dict[str, Session] = {}
@@ -201,6 +205,38 @@ async def shutdown():
         MCP_SERVER = None
 
 
+# ---------------------------
+# Helper Functions
+# ---------------------------
+
+async def process_and_send_log(websocket: WebSocket, payload: Dict[str, Any]):
+    print(f"🪝 PROCESSING: {payload}") # לוג לטרמינל
+    
+    # בדיקה האם המנתח קיים
+    if FAILURE_ANALYZER:
+        # בדיקה האם האירוע הוא שגיאה
+        is_fail = is_failure_event(payload)
+        print(f"🔍 Is Failure? {is_fail}")  # <--- הוספנו את זה!
+
+        if is_fail:
+            print(f"🔴 Failure Detected! Analyzing...")
+            try:
+                analysis = await FAILURE_ANALYZER.analyze(payload)
+                if analysis.get("status") != "ignored_non_failure_log":
+                    smart_payload = {
+                        "type": "failure_analysis",
+                        "data": analysis
+                    }
+                    await websocket.send_json(smart_payload)
+                    return 
+            except Exception as e:
+                print(f"❌ Analysis failed: {e}")
+    
+    # אם לא ניתחנו, שולחים רגיל
+    try:
+        pass
+    except Exception as e:
+        print(f"⚠️ Failed to send log via WS: {e}")
 def _assert_domain(url: str, allowed_domain: str):
     # Very simple guard; you can harden it (urlparse etc.)
     if allowed_domain not in url:
@@ -261,6 +297,101 @@ def _extract_state_block(output: str) -> Optional[dict]:
     if not m:
         return None
     return {"url": m.group(1).strip(), "title": m.group(2).strip(), "keys": m.group(3).strip()}
+# ---------------------------
+
+FRAME_FPS = 20
+FRAME_INTERVAL = 1.0 / FRAME_FPS
+FRAME_JPEG_QUALITY = 70
+
+from typing import Optional
+
+async def _grab_frame_data_url() -> Optional[str]:
+    if MCP_SERVER is None:
+        print("[frames] MCP_SERVER is None")
+        return None
+
+    try:
+        result = await MCP_SERVER.call_tool(
+            "browser_take_screenshot",
+            {"format": "jpeg", "quality": 70},
+        )
+    except Exception as e:
+        print("[frames] browser_take_screenshot failed:", repr(e))
+        return None
+
+    # result is CallToolResult
+    content = getattr(result, "content", None)
+    if not content:
+        print("[frames] CallToolResult has no content")
+        return None
+
+    # Find first image content
+    for item in content:
+        # item is usually mcp.types.ImageContent
+        mime = getattr(item, "mimeType", None) or getattr(item, "mime", None)
+        data = getattr(item, "data", None)
+
+        if data and mime:
+            return f"data:{mime};base64,{data}"
+
+    # If we got here, response shape is unexpected
+    print("[frames] No image item in content. content types:", [type(x) for x in content])
+    return None
+
+async def _frames_loop(s: Session):
+    try:
+        while s.frame_sockets:
+            try:
+                frame = await _grab_frame_data_url()
+                
+                if frame:
+                    payload = {
+                        "type": "frame",
+                        "ts": time.time(),
+                        "mime": "image/jpeg",
+                        "frame": frame,
+                    }
+
+                    for ws in list(s.frame_sockets):
+                        try:
+                            await ws.send_json(payload)
+                        except Exception:
+                            if ws in s.frame_sockets:
+                                s.frame_sockets.remove(ws)
+
+            except Exception as e:
+                # לא מפילים את הלולאה
+                 print("[frames] loop error:", repr(e))
+
+            await asyncio.sleep(FRAME_INTERVAL)
+
+    finally:
+        s.frame_task = None
+
+
+@app.websocket("/ws/sessions/{session_id}/frames")
+async def frames_ws(ws: WebSocket, session_id: str):
+    s = SESSIONS.get(session_id)
+    if not s:
+        await ws.close(code=1008)
+        return
+
+    await ws.accept()
+    s.frame_sockets.append(ws)
+    print(f"FRAMES WS CONNECTED: session={session_id}")
+
+    if s.frame_task is None:
+        s.frame_task = asyncio.create_task(_frames_loop(s))
+
+    try:
+        while True:
+            await ws.receive_text()  # keep alive
+    except WebSocketDisconnect:
+        pass
+    finally:
+        if ws in s.frame_sockets:
+            s.frame_sockets.remove(ws)
+        print(f"FRAMES WS DISCONNECTED: session={session_id}")
 
 
 # ---------------------------
@@ -298,7 +429,7 @@ async def create_session(req: CreateSessionRequest):
         s.last_snapshot = snap
 
     return CreateSessionResponse(session_id=session_id, snapshot=s.last_snapshot)
-
+ 
 
 @app.post("/sessions/{session_id}/prompt", response_model=PromptResponse)
 async def send_prompt(session_id: str, req: PromptRequest):
@@ -335,22 +466,9 @@ async def send_prompt(session_id: str, req: PromptRequest):
 
                 # Stream live to WebSocket
                 if s.ws:
-                    await s.ws.send_json(payload)
+                    await process_and_send_log(s.ws, payload)
                 
-                # Check if this event indicates a failure and analyze it
-                if FAILURE_ANALYZER and is_failure_event(payload):
-                    try:
-                        analysis = await FAILURE_ANALYZER.analyze(payload)
-                        if analysis.get("status") != "ignored_non_failure_log":
-                            # Send failure analysis via WebSocket
-                            if s.ws:
-                                await s.ws.send_json({
-                                    "type": "failure_analysis",
-                                    "data": analysis
-                                })
-                            print(f"Failure analyzed: {analysis.get('failure_category')} - {analysis.get('summary', '')[:50]}")
-                    except Exception as analysis_err:
-                        print(f"Failure analysis error: {analysis_err}")
+                # (Redundant analysis block removed - handled by process_and_send_log)
 
 
             out = (getattr(run, "final_output", None) or "").strip()
@@ -358,12 +476,20 @@ async def send_prompt(session_id: str, req: PromptRequest):
             # Check final output for failures as well
             if FAILURE_ANALYZER and out:
                 final_event = {"type": "final_output", "data": out}
+                # We send this to process_and_send_log to handle analysis, 
+                # but we might not want to send the raw final output as a log event if it's just text.
+                # However, process_and_send_log will send it if it's not a failure.
+                # The original code didn't send final_event raw.
+                # So we only invoke analysis here manually if we don't want to send raw.
+                # But to keep it consistent with "Central Gateway", let's just analyze it manually 
+                # and send the result via process_and_send_log if it IS a failure.
+                
                 if is_failure_event(final_event):
                     try:
                         analysis = await FAILURE_ANALYZER.analyze(final_event)
                         if analysis.get("status") != "ignored_non_failure_log":
                             if s.ws:
-                                await s.ws.send_json({
+                                await process_and_send_log(s.ws, {
                                     "type": "failure_analysis",
                                     "data": analysis
                                 })
@@ -371,7 +497,7 @@ async def send_prompt(session_id: str, req: PromptRequest):
                         print(f"Final output analysis error: {analysis_err}")
 
             if s.ws:
-                await s.ws.send_json({
+                await process_and_send_log(s.ws, {
                     "type": "final",
                     "data": "run completed"
                 })
@@ -402,17 +528,52 @@ async def send_prompt(session_id: str, req: PromptRequest):
                         "message": str(e),
                         "error_type": type(e).__name__
                     }
-                    analysis = await FAILURE_ANALYZER.analyze(error_event)
-                    if analysis.get("status") != "ignored_non_failure_log":
-                        if s.ws:
-                            await s.ws.send_json({
-                                "type": "failure_analysis",
-                                "data": analysis
-                            })
+                    # We can send this error event to process_and_send_log to handle it!
+                    if s.ws:
+                         await process_and_send_log(s.ws, error_event)
                 except Exception as analysis_err:
                     print(f"Exception analysis error: {analysis_err}")
             
             return PromptResponse(ok=False, session_id=session_id, output="", snapshot=s.last_snapshot, error=err)
+
+
+@app.post("/sessions/{session_id}/suggest")
+async def suggest_test(session_id: str):
+    session = SESSIONS.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Get context: either the last snapshot or just the allowed domain/url
+    context = f"Allowed Domain: {session.allowed_domain}"
+    if session.last_snapshot:
+        context += f"\nCurrent URL: {session.last_snapshot.get('url')}"
+        context += f"\nPage Title: {session.last_snapshot.get('title')}"
+        context += f"\nVisible Elements: {session.last_snapshot.get('keys')}"
+    
+    # 1. Extract History (Last 5 actions)
+    recent_history = session.history[-5:] if session.history else []
+    history_text = "\n".join([f"- {h}" for h in recent_history]) if recent_history else "None"
+
+    try:
+        client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": """You are a QA Lead. Suggest the NEXT logical test step for a Playwright automation agent.
+CRITICAL RULES:
+1. Look at the `RECENT_ACTIONS`. **DO NOT** repeat a suggestion that was just made.
+2. If the main path (e.g., Login) was just attempted, suggest a **Negative Test** (invalid input), a **Secondary Action** (Forgot Password, links), or **Navigation** (Go Back, Home).
+3. Output ONLY the prompt text. Do not include quotes or explanations."""},
+                {"role": "user", "content": f"Context: {context}\n\nRECENT_ACTIONS:\n{history_text}"}
+            ],
+            max_tokens=60,
+            temperature=0.7
+        )
+        suggestion = response.choices[0].message.content.strip()
+        return {"suggestion": suggestion}
+    except Exception as e:
+        print(f"Suggestion failed: {e}")
+        return {"suggestion": "Verify the page title and main heading."}
 
 
 @app.get("/sessions/{session_id}", response_model=SessionStateResponse)

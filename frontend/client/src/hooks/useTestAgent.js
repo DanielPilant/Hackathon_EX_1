@@ -7,6 +7,7 @@ export const useTestAgent = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [isRunningTest, setIsRunningTest] = useState(false);
   const [isFullScanning, setIsFullScanning] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false);
   const [testHistory, setTestHistory] = useState([]);
 
   // Buffer for incoming logs to prevent excessive re-renders
@@ -34,38 +35,72 @@ export const useTestAgent = () => {
     // כשמתקבלת הודעה מהשרת (לוגים של MCP)
     ws.onmessage = (event) => {
       try {
-        const logData = JSON.parse(event.data);
-        // console.log("🚀 [MCP LOG]:", logData);
+        console.log("🔥 RAW WS MESSAGE:", event.data); // <--- Junction B: Raw Log
+        const msg = JSON.parse(event.data);
+        console.log("🧩 PARSED TYPE:", msg.type); // <--- Junction B: Parsed Type
 
-        // Extract message content
-        const message =
-          logData.message || logData.content || JSON.stringify(logData);
+        // -------------------------------------------
+        // 1. Handle Failure Analysis (The Good Stuff)
+        // -------------------------------------------
+        if (msg.type === "failure_analysis") {
+          const analysis = msg.data;
 
-        // Smart Status Detection
+          // FILTER: Skip low-quality "UNKNOWN" analyses
+          if (analysis.failure_category === "UNKNOWN") {
+            console.debug("Skipped UNKNOWN failure analysis");
+            return;
+          }
+
+          const newEntry = {
+            id: Date.now() + Math.random(),
+            type: "failure_card", // Custom type for rendering
+            status: "fail", // Triggers red styling
+            title: analysis.failure_category || "Unknown Failure",
+            summary: analysis.summary,
+            fix: analysis.suggested_fix,
+            reason: analysis.why,
+            timestamp: new Date().toLocaleTimeString(),
+            steps: [], // Empty steps as we render a custom card
+          };
+          logBufferRef.current.push(newEntry);
+          return;
+        }
+
+        // -------------------------------------------
+        // 2. Handle Standard Logs (Smart Filtering)
+        // -------------------------------------------
+        const content = msg.content || msg.message || JSON.stringify(msg);
+
+        // FILTER LOGIC:
+        // If it looks like a raw error/failure, IGNORE IT.
+        // We trust the "failure_analysis" event to handle it beautifully.
+        if (/error|fail|timeout|exception/i.test(content)) {
+          return;
+        }
+
+        // Otherwise, display as info/pass
         let status = "info";
-        if (/pass|success/i.test(message)) status = "pass";
-        else if (/fail|error|exception/i.test(message)) status = "fail";
-        else if (/processing|running|start/i.test(message)) status = "running";
+        if (/pass|success/i.test(content)) status = "pass";
+        else if (/processing|running|start/i.test(content)) status = "running";
 
-        // Create new history entry
         const newEntry = {
-          id: Date.now() + Math.random(), // Ensure unique ID
+          id: Date.now() + Math.random(),
           title: "System Event",
           timestamp: new Date().toLocaleString(),
-          isLog: true, // Flag to distinguish from user prompts if needed
+          isLog: true,
           steps: [
             {
               id: Date.now(),
-              stepName: message,
+              stepName: content,
               status: status,
-              description: logData.details || "",
+              description: msg.details || "",
               timestamp: new Date().toLocaleTimeString(),
               duration: "0.1s",
             },
           ],
         };
 
-        // Push to buffer instead of state
+        console.log("✅ Adding to State:", newEntry); // <--- Junction B: State Update Log
         logBufferRef.current.push(newEntry);
       } catch {
         console.log("Received raw message:", event.data);
@@ -222,15 +257,32 @@ export const useTestAgent = () => {
     setTimeout(() => setIsFullScanning(false), 2000);
   };
 
+  const generateSuggestion = async () => {
+    if (!sessionId) return null;
+    setIsSuggesting(true);
+    try {
+      const data = await backend.getSuggestion(sessionId);
+      return data.suggestion;
+    } catch (error) {
+      console.error("Suggestion Error:", error);
+      return null;
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
+
   return {
+    sessionId,
     userId,
     testHistory,
     isScanning,
     isConnected,
     isRunningTest,
     isFullScanning,
+    isSuggesting,
     connectToUrl,
     runPrompt,
     runFullScan,
+    generateSuggestion,
   };
 };
