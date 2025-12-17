@@ -162,6 +162,9 @@ class Session:
     last_snapshot: Optional[dict] = None
     ws: Optional[WebSocket] = None
 
+    frame_sockets: List[WebSocket] = field(default_factory=list)
+    frame_task: Optional[asyncio.Task] = None
+
 
 
 SESSIONS: Dict[str, Session] = {}
@@ -261,6 +264,100 @@ def _extract_state_block(output: str) -> Optional[dict]:
     if not m:
         return None
     return {"url": m.group(1).strip(), "title": m.group(2).strip(), "keys": m.group(3).strip()}
+# ---------------------------
+
+FRAME_FPS = 6
+FRAME_INTERVAL = 1.0 / FRAME_FPS
+FRAME_JPEG_QUALITY = 70
+
+from typing import Optional
+
+async def _grab_frame_data_url() -> Optional[str]:
+    if MCP_SERVER is None:
+        print("[frames] MCP_SERVER is None")
+        return None
+
+    try:
+        result = await MCP_SERVER.call_tool(
+            "browser_take_screenshot",
+            {"format": "jpeg", "quality": 70},
+        )
+    except Exception as e:
+        print("[frames] browser_take_screenshot failed:", repr(e))
+        return None
+
+    # result is CallToolResult
+    content = getattr(result, "content", None)
+    if not content:
+        print("[frames] CallToolResult has no content")
+        return None
+
+    # Find first image content
+    for item in content:
+        # item is usually mcp.types.ImageContent
+        mime = getattr(item, "mimeType", None) or getattr(item, "mime", None)
+        data = getattr(item, "data", None)
+
+        if data and mime:
+            return f"data:{mime};base64,{data}"
+
+    # If we got here, response shape is unexpected
+    print("[frames] No image item in content. content types:", [type(x) for x in content])
+    return None
+
+async def _frames_loop(s: Session):
+    try:
+        while s.frame_sockets:
+            try:
+                frame = await _grab_frame_data_url()
+                if frame:
+                    payload = {
+                        "type": "frame",
+                        "ts": time.time(),
+                        "mime": "image/jpeg",
+                        "frame": frame,
+                    }
+
+                    for ws in list(s.frame_sockets):
+                        try:
+                            await ws.send_json(payload)
+                        except Exception:
+                            if ws in s.frame_sockets:
+                                s.frame_sockets.remove(ws)
+
+            except Exception as e:
+                # לא מפילים את הלולאה
+                 print("[frames] loop error:", repr(e))
+
+            await asyncio.sleep(FRAME_INTERVAL)
+
+    finally:
+        s.frame_task = None
+
+
+@app.websocket("/ws/sessions/{session_id}/frames")
+async def frames_ws(ws: WebSocket, session_id: str):
+    s = SESSIONS.get(session_id)
+    if not s:
+        await ws.close(code=1008)
+        return
+
+    await ws.accept()
+    s.frame_sockets.append(ws)
+    print(f"FRAMES WS CONNECTED: session={session_id}")
+
+    if s.frame_task is None:
+        s.frame_task = asyncio.create_task(_frames_loop(s))
+
+    try:
+        while True:
+            await ws.receive_text()  # keep alive
+    except WebSocketDisconnect:
+        pass
+    finally:
+        if ws in s.frame_sockets:
+            s.frame_sockets.remove(ws)
+        print(f"FRAMES WS DISCONNECTED: session={session_id}")
 
 
 # ---------------------------
