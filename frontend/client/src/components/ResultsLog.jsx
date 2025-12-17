@@ -1,8 +1,59 @@
 import React from "react";
-import { Clock, List } from "lucide-react";
+import { Clock, List, AlertTriangle, Lightbulb } from "lucide-react";
 import { ResultItem } from "./ResultItem";
 import { GlassCard } from "./ui/GlassCard";
 import { AnimatePresence, motion } from "framer-motion";
+
+const FailureCard = ({ run }) => (
+  <div className="relative overflow-hidden rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/10 shadow-sm hover:shadow-md transition-all duration-300">
+    {/* Left Accent Border */}
+    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-red-500" />
+
+    <div className="p-4 pl-6">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-3">
+        <div className="p-1.5 bg-red-100 dark:bg-red-900/30 rounded-full">
+          <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
+        </div>
+        <h3 className="text-sm font-bold text-red-700 dark:text-red-400 uppercase tracking-wide">
+          {run.title}
+        </h3>
+        <span className="ml-auto text-[10px] font-mono text-red-400/70">
+          {run.timestamp}
+        </span>
+      </div>
+
+      {/* Body: Summary & Reason */}
+      <div className="space-y-2 mb-4">
+        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 leading-relaxed">
+          {run.summary}
+        </p>
+        {run.reason && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 font-mono bg-white/50 dark:bg-black/20 p-2 rounded border border-gray-100 dark:border-white/5">
+            {run.reason}
+          </p>
+        )}
+      </div>
+
+      {/* Footer: The Fix */}
+      {run.fix && (
+        <div className="mt-3 pt-3 border-t border-red-100 dark:border-red-900/30">
+          <div className="flex items-start gap-2">
+            <Lightbulb className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider block mb-1">
+                Suggested Fix
+              </span>
+              <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                {run.fix}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+);
 
 export const ResultsLog = ({ testHistory, isRunningTest }) => {
   return (
@@ -37,7 +88,11 @@ export const ResultsLog = ({ testHistory, isRunningTest }) => {
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
               >
-                <ResultItem run={run} />
+                {run.type === "failure_card" ? (
+                  <FailureCard run={run} />
+                ) : (
+                  <ResultItem run={run} />
+                )}
               </motion.div>
             ))}
           </AnimatePresence>

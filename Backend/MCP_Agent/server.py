@@ -204,6 +204,38 @@ async def shutdown():
         MCP_SERVER = None
 
 
+# ---------------------------
+# Helper Functions
+# ---------------------------
+
+async def process_and_send_log(websocket: WebSocket, payload: Dict[str, Any]):
+    print(f"🪝 PROCESSING: {payload}") # לוג לטרמינל
+    
+    # בדיקה האם המנתח קיים
+    if FAILURE_ANALYZER:
+        # בדיקה האם האירוע הוא שגיאה
+        is_fail = is_failure_event(payload)
+        print(f"🔍 Is Failure? {is_fail}")  # <--- הוספנו את זה!
+
+        if is_fail:
+            print(f"🔴 Failure Detected! Analyzing...")
+            try:
+                analysis = await FAILURE_ANALYZER.analyze(payload)
+                if analysis.get("status") != "ignored_non_failure_log":
+                    smart_payload = {
+                        "type": "failure_analysis",
+                        "data": analysis
+                    }
+                    await websocket.send_json(smart_payload)
+                    return 
+            except Exception as e:
+                print(f"❌ Analysis failed: {e}")
+    
+    # אם לא ניתחנו, שולחים רגיל
+    try:
+        pass
+    except Exception as e:
+        print(f"⚠️ Failed to send log via WS: {e}")
 def _assert_domain(url: str, allowed_domain: str):
     # Very simple guard; you can harden it (urlparse etc.)
     if allowed_domain not in url:
@@ -432,22 +464,9 @@ async def send_prompt(session_id: str, req: PromptRequest):
 
                 # Stream live to WebSocket
                 if s.ws:
-                    await s.ws.send_json(payload)
+                    await process_and_send_log(s.ws, payload)
                 
-                # Check if this event indicates a failure and analyze it
-                if FAILURE_ANALYZER and is_failure_event(payload):
-                    try:
-                        analysis = await FAILURE_ANALYZER.analyze(payload)
-                        if analysis.get("status") != "ignored_non_failure_log":
-                            # Send failure analysis via WebSocket
-                            if s.ws:
-                                await s.ws.send_json({
-                                    "type": "failure_analysis",
-                                    "data": analysis
-                                })
-                            print(f"Failure analyzed: {analysis.get('failure_category')} - {analysis.get('summary', '')[:50]}")
-                    except Exception as analysis_err:
-                        print(f"Failure analysis error: {analysis_err}")
+                # (Redundant analysis block removed - handled by process_and_send_log)
 
 
             out = (getattr(run, "final_output", None) or "").strip()
@@ -455,12 +474,20 @@ async def send_prompt(session_id: str, req: PromptRequest):
             # Check final output for failures as well
             if FAILURE_ANALYZER and out:
                 final_event = {"type": "final_output", "data": out}
+                # We send this to process_and_send_log to handle analysis, 
+                # but we might not want to send the raw final output as a log event if it's just text.
+                # However, process_and_send_log will send it if it's not a failure.
+                # The original code didn't send final_event raw.
+                # So we only invoke analysis here manually if we don't want to send raw.
+                # But to keep it consistent with "Central Gateway", let's just analyze it manually 
+                # and send the result via process_and_send_log if it IS a failure.
+                
                 if is_failure_event(final_event):
                     try:
                         analysis = await FAILURE_ANALYZER.analyze(final_event)
                         if analysis.get("status") != "ignored_non_failure_log":
                             if s.ws:
-                                await s.ws.send_json({
+                                await process_and_send_log(s.ws, {
                                     "type": "failure_analysis",
                                     "data": analysis
                                 })
@@ -468,7 +495,7 @@ async def send_prompt(session_id: str, req: PromptRequest):
                         print(f"Final output analysis error: {analysis_err}")
 
             if s.ws:
-                await s.ws.send_json({
+                await process_and_send_log(s.ws, {
                     "type": "final",
                     "data": "run completed"
                 })
@@ -499,13 +526,9 @@ async def send_prompt(session_id: str, req: PromptRequest):
                         "message": str(e),
                         "error_type": type(e).__name__
                     }
-                    analysis = await FAILURE_ANALYZER.analyze(error_event)
-                    if analysis.get("status") != "ignored_non_failure_log":
-                        if s.ws:
-                            await s.ws.send_json({
-                                "type": "failure_analysis",
-                                "data": analysis
-                            })
+                    # We can send this error event to process_and_send_log to handle it!
+                    if s.ws:
+                         await process_and_send_log(s.ws, error_event)
                 except Exception as analysis_err:
                     print(f"Exception analysis error: {analysis_err}")
             
