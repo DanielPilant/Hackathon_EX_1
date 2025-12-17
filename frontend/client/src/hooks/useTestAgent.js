@@ -67,7 +67,26 @@ export const useTestAgent = () => {
         }
 
         // -------------------------------------------
-        // 2. Handle Standard Logs (Smart Filtering)
+        // 2. Handle Live Execution Steps (The Beautiful Stuff)
+        // -------------------------------------------
+        if (msg.type === "execution_step") {
+          const step = msg.data;
+          const newEntry = {
+            id: Date.now() + Math.random(),
+            type: "step_card", // Custom type for rendering
+            status: "info",
+            icon: step.icon,
+            title: step.action,
+            description: step.details,
+            timestamp: step.timestamp,
+            steps: [],
+          };
+          logBufferRef.current.push(newEntry);
+          return;
+        }
+
+        // -------------------------------------------
+        // 3. Handle Standard Logs (Smart Filtering)
         // -------------------------------------------
         const content = msg.content || msg.message || JSON.stringify(msg);
 

@@ -69,6 +69,33 @@ const FailureCard = ({ run }) => (
   </div>
 );
 
+const StepCard = ({ run }) => (
+  <div className="relative overflow-hidden rounded-lg border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 transition-all duration-200 group">
+    {/* Left Accent Border */}
+    <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500/50 group-hover:bg-blue-400 transition-colors" />
+
+    <div className="p-3 pl-5 flex items-center gap-4">
+      {/* Icon */}
+      <div className="text-xl">{run.icon}</div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-0.5">
+          <h4 className="text-xs font-bold text-blue-200 uppercase tracking-wider">
+            {run.title}
+          </h4>
+          <span className="text-[10px] text-slate-500 font-mono">
+            {run.timestamp}
+          </span>
+        </div>
+        <p className="text-xs text-slate-400 font-mono truncate">
+          {run.description}
+        </p>
+      </div>
+    </div>
+  </div>
+);
+
 export const ResultsLog = ({ testHistory, isRunningTest }) => {
   const [filter, setFilter] = useState("all");
 
@@ -190,6 +217,8 @@ export const ResultsLog = ({ testHistory, isRunningTest }) => {
               >
                 {run.type === "failure_card" ? (
                   <FailureCard run={run} />
+                ) : run.type === "step_card" ? (
+                  <StepCard run={run} />
                 ) : (
                   <ResultItem run={run} />
                 )}

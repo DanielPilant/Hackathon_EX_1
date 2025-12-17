@@ -209,6 +209,90 @@ async def shutdown():
 # Helper Functions
 # ---------------------------
 
+def format_live_step(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Transforms raw MCP logs into beautiful, human-readable steps.
+    """
+    # We only care about tool calls or specific events
+    event_type = payload.get("type", "")
+    data = str(payload.get("data", "")).lower()
+
+    # 1. Navigation
+    if "goto" in data or "navigat" in data:
+        # Extract URL if possible
+        url_match = re.search(r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+", payload.get("data", ""))
+        url = url_match.group(0) if url_match else "target page"
+        return {
+            "type": "execution_step",
+            "data": {
+                "icon": "🌐",
+                "action": "Navigating",
+                "details": f"to {url}",
+                "timestamp": time.strftime("%H:%M:%S")
+            }
+        }
+
+    # 2. Clicks
+    if "click" in data:
+        # Try to extract selector
+        selector = "element"
+        if "selector=" in data:
+            selector = data.split("selector=")[1].split(" ")[0]
+        elif "'" in payload.get("data", ""):
+             # simplistic extraction
+             parts = payload.get("data", "").split("'")
+             if len(parts) > 1:
+                 selector = parts[1]
+        
+        return {
+            "type": "execution_step",
+            "data": {
+                "icon": "🖱️",
+                "action": "Clicking",
+                "details": selector,
+                "timestamp": time.strftime("%H:%M:%S")
+            }
+        }
+
+    # 3. Typing / Filling
+    if "fill" in data or "type" in data:
+        return {
+            "type": "execution_step",
+            "data": {
+                "icon": "⌨️",
+                "action": "Typing",
+                "details": "input data...",
+                "timestamp": time.strftime("%H:%M:%S")
+            }
+        }
+    
+    # 4. Screenshots
+    if "screenshot" in data:
+        return {
+            "type": "execution_step",
+            "data": {
+                "icon": "📸",
+                "action": "Capturing",
+                "details": "visual state",
+                "timestamp": time.strftime("%H:%M:%S")
+            }
+        }
+
+    # If it's just a generic log, maybe return it as a generic step or ignore
+    # For now, let's return None to ignore noise, or a generic "Processing" step
+    if "tool" in event_type:
+         return {
+            "type": "execution_step",
+            "data": {
+                "icon": "⚙️",
+                "action": "Executing",
+                "details": payload.get("data", "")[:50] + "...",
+                "timestamp": time.strftime("%H:%M:%S")
+            }
+        }
+    
+    return None
+
 async def process_and_send_log(websocket: WebSocket, payload: Dict[str, Any]):
     print(f"🪝 PROCESSING: {payload}") # לוג לטרמינל
     
@@ -232,9 +316,15 @@ async def process_and_send_log(websocket: WebSocket, payload: Dict[str, Any]):
             except Exception as e:
                 print(f"❌ Analysis failed: {e}")
     
-    # אם לא ניתחנו, שולחים רגיל
+    # אם לא ניתחנו, שולחים רגיל (או מעוצב)
     try:
-        pass
+        formatted = format_live_step(payload)
+        if formatted:
+            await websocket.send_json(formatted)
+        else:
+            # Send raw if we couldn't format it, or maybe just skip?
+            # Let's send raw for now to maintain backward compatibility for other things
+            await websocket.send_json(payload)
     except Exception as e:
         print(f"⚠️ Failed to send log via WS: {e}")
 def _assert_domain(url: str, allowed_domain: str):
