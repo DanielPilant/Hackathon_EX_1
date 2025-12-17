@@ -1,0 +1,5 @@
+mcp
+playwright
+python-dotenv
+google-generativeai
+pydantic
