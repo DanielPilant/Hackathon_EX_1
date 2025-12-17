@@ -2,7 +2,7 @@ import React from "react";
 import { Clock, List } from "lucide-react";
 import { ResultItem } from "./ResultItem";
 import { GlassCard } from "./ui/GlassCard";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 
 export const ResultsLog = ({ testHistory, isRunningTest }) => {
   return (
