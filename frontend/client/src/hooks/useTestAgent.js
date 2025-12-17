@@ -34,38 +34,63 @@ export const useTestAgent = () => {
     // כשמתקבלת הודעה מהשרת (לוגים של MCP)
     ws.onmessage = (event) => {
       try {
-        const logData = JSON.parse(event.data);
-        // console.log("🚀 [MCP LOG]:", logData);
+        const msg = JSON.parse(event.data);
 
-        // Extract message content
-        const message =
-          logData.message || logData.content || JSON.stringify(logData);
+        // -------------------------------------------
+        // 1. Handle Failure Analysis (The Good Stuff)
+        // -------------------------------------------
+        if (msg.type === "failure_analysis") {
+          const analysis = msg.data;
 
-        // Smart Status Detection
+          const newEntry = {
+            id: Date.now() + Math.random(),
+            type: "failure_card", // Custom type for rendering
+            status: "fail", // Triggers red styling
+            title: analysis.failure_category || "Unknown Failure",
+            summary: analysis.summary,
+            fix: analysis.suggested_fix,
+            reason: analysis.why,
+            timestamp: new Date().toLocaleTimeString(),
+            steps: [], // Empty steps as we render a custom card
+          };
+          logBufferRef.current.push(newEntry);
+          return;
+        }
+
+        // -------------------------------------------
+        // 2. Handle Standard Logs (Smart Filtering)
+        // -------------------------------------------
+        const content = msg.content || msg.message || JSON.stringify(msg);
+
+        // FILTER LOGIC:
+        // If it looks like a raw error/failure, IGNORE IT.
+        // We trust the "failure_analysis" event to handle it beautifully.
+        if (/error|fail|timeout|exception/i.test(content)) {
+          return;
+        }
+
+        // Otherwise, display as info/pass
         let status = "info";
-        if (/pass|success/i.test(message)) status = "pass";
-        else if (/fail|error|exception/i.test(message)) status = "fail";
-        else if (/processing|running|start/i.test(message)) status = "running";
+        if (/pass|success/i.test(content)) status = "pass";
+        else if (/processing|running|start/i.test(content)) status = "running";
 
-        // Create new history entry
         const newEntry = {
-          id: Date.now() + Math.random(), // Ensure unique ID
+          id: Date.now() + Math.random(),
           title: "System Event",
           timestamp: new Date().toLocaleString(),
-          isLog: true, // Flag to distinguish from user prompts if needed
+          isLog: true,
           steps: [
             {
               id: Date.now(),
-              stepName: message,
+              stepName: content,
               status: status,
-              description: logData.details || "",
+              description: msg.details || "",
               timestamp: new Date().toLocaleTimeString(),
               duration: "0.1s",
             },
           ],
         };
 
-        // Push to buffer instead of state
         logBufferRef.current.push(newEntry);
       } catch {
         console.log("Received raw message:", event.data);
