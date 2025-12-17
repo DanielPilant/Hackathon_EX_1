@@ -7,12 +7,17 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
 from agents import Agent, Runner
 from agents.mcp import MCPServerStreamableHttp
 from openai import RateLimitError
+
+from agents import set_tracing_disabled
+set_tracing_disabled(True)
+
+
 
 load_dotenv()
 
@@ -132,6 +137,8 @@ class Session:
     # Keep it small to reduce tokens
     history: List[str] = field(default_factory=list)
     last_snapshot: Optional[dict] = None
+    ws: Optional[WebSocket] = None
+
 
 
 SESSIONS: Dict[str, Session] = {}
@@ -278,11 +285,35 @@ async def send_prompt(session_id: str, req: PromptRequest):
         s.last_used_at = time.time()
         try:
             composed = _compose_prompt(s, req.prompt)
-            run = await run_with_tpm_fallback(s.agent, composed, max_attempts=req.max_attempts)
-            out = (run.final_output or "").strip()
+
+            run = Runner.run_streamed(s.agent, composed,max_turns=50)
+
+            final_output = None
+
+            async for event in run.stream_events():
+                payload = {
+                    "type": event.type,
+                    "data": None,
+                }
+
+                if hasattr(event, "item") and event.item:
+                    payload["data"] = str(event.item)
+
+                # 🔴 שידור חי ל־WebSocket
+                if s.ws:
+                    await s.ws.send_json(payload)
+            
+
+
+            out = (getattr(run, "final_output", None) or "").strip()
+
+            if s.ws:
+                await s.ws.send_json({
+                    "type": "final",
+                    "data": "run completed"
+                })
 
             s.history.append(out[:1200])
-            # Keep history bounded
             if len(s.history) > 10:
                 s.history = s.history[-10:]
 
@@ -290,7 +321,12 @@ async def send_prompt(session_id: str, req: PromptRequest):
             if snap:
                 s.last_snapshot = snap
 
-            return PromptResponse(ok=True, session_id=session_id, output=out, snapshot=s.last_snapshot)
+            return PromptResponse(
+                ok=True,
+                session_id=session_id,
+                output=out,
+                snapshot=s.last_snapshot
+            )
 
         except Exception as e:
             err = {"type": type(e).__name__, "message": str(e)}
@@ -319,3 +355,25 @@ async def close_session(session_id: str):
     # Note: closing actual browser/page depends on MCP tool support.
     # For now we just drop the session reference.
     return {"ok": True, "session_id": session_id}
+
+
+@app.websocket("/ws/sessions/{session_id}")
+async def session_ws(ws: WebSocket, session_id: str):
+    s = SESSIONS.get(session_id)
+    if not s:
+        await ws.close(code=1008)
+        return
+
+    await ws.accept()
+    s.ws = ws
+    print(f"WS CONNECTED: session={session_id}")
+
+    try:
+        while True:
+            # keep connection alive; we don't expect messages from client
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        print(f"WS DISCONNECTED: session={session_id}")
+    finally:
+        if s.ws is ws:
+            s.ws = None
