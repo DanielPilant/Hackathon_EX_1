@@ -223,6 +223,7 @@ export const useTestAgent = () => {
   };
 
   return {
+    sessionId,
     userId,
     testHistory,
     isScanning,

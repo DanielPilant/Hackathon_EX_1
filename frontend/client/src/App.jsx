@@ -8,6 +8,7 @@ import { useTestAgent } from "./hooks/useTestAgent"; // <--- ייבוא המוח
 function App() {
   // 1. שימוש במוח שבנינו
   const {
+    sessionId,
     isConnected,
     isScanning,
     isRunningTest,
@@ -33,7 +34,7 @@ function App() {
           />
 
           <div className="flex-1 h-full">
-            <VideoPlayer />
+            <VideoPlayer sessionId={sessionId} />
           </div>
         </div>
 

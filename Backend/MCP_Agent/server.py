@@ -266,7 +266,7 @@ def _extract_state_block(output: str) -> Optional[dict]:
     return {"url": m.group(1).strip(), "title": m.group(2).strip(), "keys": m.group(3).strip()}
 # ---------------------------
 
-FRAME_FPS = 6
+FRAME_FPS = 20
 FRAME_INTERVAL = 1.0 / FRAME_FPS
 FRAME_JPEG_QUALITY = 70
 
@@ -310,6 +310,7 @@ async def _frames_loop(s: Session):
         while s.frame_sockets:
             try:
                 frame = await _grab_frame_data_url()
+                
                 if frame:
                     payload = {
                         "type": "frame",
@@ -395,7 +396,7 @@ async def create_session(req: CreateSessionRequest):
         s.last_snapshot = snap
 
     return CreateSessionResponse(session_id=session_id, snapshot=s.last_snapshot)
-
+ 
 
 @app.post("/sessions/{session_id}/prompt", response_model=PromptResponse)
 async def send_prompt(session_id: str, req: PromptRequest):

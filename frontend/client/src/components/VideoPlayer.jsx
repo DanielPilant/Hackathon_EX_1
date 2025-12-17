@@ -2,26 +2,48 @@ import { useEffect, useState } from "react";
 import { Monitor, Play } from "lucide-react";
 import { GlassCard } from "./ui/GlassCard";
 
-export const VideoPlayer = () => {
+export const VideoPlayer = ({ sessionId }) => {
   const [src, setSrc] = useState("");
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const ws = new WebSocket("ws://127.0.0.1:8000/ws");
+    // אין סשן => לא מתחברים
+    if (!sessionId) {
+      setConnected(false);
+      setSrc("");
+      return;
+    }
+
+    const ws = new WebSocket(
+      `ws://127.0.0.1:8000/ws/sessions/${sessionId}/frames`
+    );
 
     ws.onopen = () => setConnected(true);
     ws.onclose = () => setConnected(false);
     ws.onerror = () => setConnected(false);
 
     ws.onmessage = (e) => {
-      const ev = JSON.parse(e.data);
-      if (ev.action_type === "frame" && ev.frame) {
-        setSrc(ev.frame);
-      }
+      try {
+        const ev = JSON.parse(e.data);
+
+        if (ev?.type === "frame" && ev?.frame) {
+          // כי זה כבר data URL מלא
+          setSrc(ev.frame);
+        }
+      } catch {}
     };
 
-    return () => ws.close();
-  }, []);
+
+    // keep-alive קטן כדי שהשרת (שקורא receive_text) יקבל משהו מדי פעם
+    const heartbeat = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) ws.send("ping");
+    }, 15000);
+
+    return () => {
+      clearInterval(heartbeat);
+      ws.close();
+    };
+  }, [sessionId]);
 
   return (
     <GlassCard className="h-full p-0 flex flex-col overflow-hidden" delay={0.3}>
@@ -57,7 +79,7 @@ export const VideoPlayer = () => {
               <Play className="w-5 h-5 text-gray-400 ml-0.5" />
             </div>
             <p className="text-sm text-gray-500 font-medium">
-              No active session
+              {sessionId ? "Waiting for frames..." : "No active session"}
             </p>
           </div>
         )}
