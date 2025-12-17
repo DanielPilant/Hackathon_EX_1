@@ -144,7 +144,7 @@ export const ResultsLog = ({ testHistory, isRunningTest }) => {
   }, [testHistory, filter]);
 
   return (
-    <GlassCard className="h-1/2 p-0 flex flex-col overflow-hidden" delay={0.4}>
+    <GlassCard className="h-full p-0 flex flex-col overflow-hidden" delay={0.4}>
       {/* Sticky Header with Filters */}
       <div className="sticky top-0 z-20 bg-black/40 backdrop-blur-xl border-b border-white/5 p-4 space-y-4">
         {/* Title Row */}

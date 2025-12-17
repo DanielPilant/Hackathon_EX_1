@@ -23,6 +23,7 @@ export const ControlPanel = ({
   onRunTest,
   onFullScan,
   onGenerateSuggestion,
+  className,
 }) => {
   const [targetUrl, setTargetUrl] = useState("");
   const [userPrompt, setUserPrompt] = useState("");
@@ -43,7 +44,7 @@ export const ControlPanel = ({
   };
 
   return (
-    <GlassCard className="w-1/3 p-6 flex flex-col gap-6" delay={0.2}>
+    <GlassCard className={clsx("p-6 flex flex-col gap-6", className)} delay={0.2}>
       {/* Header */}
       <div className="flex items-center gap-2 pb-4 border-b border-white/5">
         <Command className="w-5 h-5 text-blue-400" />
