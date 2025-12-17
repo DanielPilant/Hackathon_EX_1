@@ -215,12 +215,13 @@ def format_live_step(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     # We only care about tool calls or specific events
     event_type = payload.get("type", "")
-    data = str(payload.get("data", "")).lower()
+    data = str(payload.get("data", ""))
+    data_lower = data.lower()
 
     # 1. Navigation
-    if "goto" in data or "navigat" in data:
+    if "goto" in data_lower or "navigat" in data_lower:
         # Extract URL if possible
-        url_match = re.search(r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+", payload.get("data", ""))
+        url_match = re.search(r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+", data)
         url = url_match.group(0) if url_match else "target page"
         return {
             "type": "execution_step",
@@ -228,19 +229,19 @@ def format_live_step(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 "icon": "🌐",
                 "action": "Navigating",
                 "details": f"to {url}",
-                "timestamp": time.strftime("%H:%M:%S")
+                "timestamp": time.strftime("%H:%M:%S"),
+                "status": "info"
             }
         }
 
     # 2. Clicks
-    if "click" in data:
+    if "click" in data_lower:
         # Try to extract selector
         selector = "element"
         if "selector=" in data:
             selector = data.split("selector=")[1].split(" ")[0]
-        elif "'" in payload.get("data", ""):
-             # simplistic extraction
-             parts = payload.get("data", "").split("'")
+        elif "'" in data:
+             parts = data.split("'")
              if len(parts) > 1:
                  selector = parts[1]
         
@@ -250,44 +251,64 @@ def format_live_step(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 "icon": "🖱️",
                 "action": "Clicking",
                 "details": selector,
-                "timestamp": time.strftime("%H:%M:%S")
+                "timestamp": time.strftime("%H:%M:%S"),
+                "status": "info"
             }
         }
 
     # 3. Typing / Filling
-    if "fill" in data or "type" in data:
+    if "fill" in data_lower or "type" in data_lower:
         return {
             "type": "execution_step",
             "data": {
                 "icon": "⌨️",
                 "action": "Typing",
                 "details": "input data...",
-                "timestamp": time.strftime("%H:%M:%S")
+                "timestamp": time.strftime("%H:%M:%S"),
+                "status": "info"
             }
         }
     
     # 4. Screenshots
-    if "screenshot" in data:
+    if "screenshot" in data_lower:
         return {
             "type": "execution_step",
             "data": {
                 "icon": "📸",
                 "action": "Capturing",
                 "details": "visual state",
-                "timestamp": time.strftime("%H:%M:%S")
+                "timestamp": time.strftime("%H:%M:%S"),
+                "status": "info"
             }
         }
 
-    # If it's just a generic log, maybe return it as a generic step or ignore
-    # For now, let's return None to ignore noise, or a generic "Processing" step
-    if "tool" in event_type:
+    # 5. Final / Success
+    if event_type == "final" or "run completed" in data_lower:
          return {
             "type": "execution_step",
             "data": {
-                "icon": "⚙️",
-                "action": "Executing",
-                "details": payload.get("data", "")[:50] + "...",
-                "timestamp": time.strftime("%H:%M:%S")
+                "icon": "✅",
+                "action": "Test Completed",
+                "details": "The session finished successfully.",
+                "timestamp": time.strftime("%H:%M:%S"),
+                "status": "success"
+            }
+        }
+
+    # 6. Generic Logs (Fallback) - Catch-all for other tool events or logs
+    # We want to avoid sending raw JSON, so we wrap everything else.
+    if event_type in ["log", "tool_call", "tool_result", "info"] or data:
+         # Clean up data if it's a dict string or too long
+         clean_details = data[:100] + "..." if len(data) > 100 else data
+         
+         return {
+            "type": "execution_step",
+            "data": {
+                "icon": "ℹ️",
+                "action": "Processing",
+                "details": clean_details,
+                "timestamp": time.strftime("%H:%M:%S"),
+                "status": "info"
             }
         }
     
@@ -300,7 +321,7 @@ async def process_and_send_log(websocket: WebSocket, payload: Dict[str, Any]):
     if FAILURE_ANALYZER:
         # בדיקה האם האירוע הוא שגיאה
         is_fail = is_failure_event(payload)
-        print(f"🔍 Is Failure? {is_fail}")  # <--- הוספנו את זה!
+        print(f"🔍 Is Failure? {is_fail}")
 
         if is_fail:
             print(f"🔴 Failure Detected! Analyzing...")
@@ -316,15 +337,15 @@ async def process_and_send_log(websocket: WebSocket, payload: Dict[str, Any]):
             except Exception as e:
                 print(f"❌ Analysis failed: {e}")
     
-    # אם לא ניתחנו, שולחים רגיל (או מעוצב)
+    # STRICT TRANSFORMATION: Never send raw payload
     try:
         formatted = format_live_step(payload)
         if formatted:
             await websocket.send_json(formatted)
         else:
-            # Send raw if we couldn't format it, or maybe just skip?
-            # Let's send raw for now to maintain backward compatibility for other things
-            await websocket.send_json(payload)
+            # If format_live_step returns None, it means we decided to ignore this log.
+            # Do NOT send raw payload.
+            pass
     except Exception as e:
         print(f"⚠️ Failed to send log via WS: {e}")
 def _assert_domain(url: str, allowed_domain: str):

@@ -74,7 +74,7 @@ export const useTestAgent = () => {
           const newEntry = {
             id: Date.now() + Math.random(),
             type: "step_card", // Custom type for rendering
-            status: "info",
+            status: step.status || "info", // Use backend status or default to info
             icon: step.icon,
             title: step.action,
             description: step.details,
