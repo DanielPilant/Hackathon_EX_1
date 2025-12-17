@@ -75,7 +75,9 @@ export const useTestAgent = () => {
           steps: [
             {
               id: Date.now(),
-              stepName: isFail ? "Action Failed" : cleanOutput || "Action Completed",
+              stepName: isFail
+                ? "Action Failed"
+                : cleanOutput || "Action Completed",
               status: status,
               errorMessage: isFail ? cleanOutput : undefined,
               timestamp: new Date().toLocaleTimeString(),
@@ -90,7 +92,7 @@ export const useTestAgent = () => {
       console.error("Prompt Error:", error);
       const errorMsg =
         error.response?.data?.detail || error.message || "Unknown error";
-      
+
       // Add a failed run to history so user sees it in the log
       const newRun = {
         id: Date.now(),
@@ -108,7 +110,7 @@ export const useTestAgent = () => {
         ],
       };
       setTestHistory((prev) => [newRun, ...prev]);
-      
+
       // Optional: still alert if critical
       // alert(`Test Failed: ${errorMsg}`);
     } finally {
