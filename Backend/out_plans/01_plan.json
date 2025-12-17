@@ -1,0 +1,48 @@
+{
+  "plan": [
+    {
+      "step_id": 1,
+      "description": "Navigate to the saving plan application homepage",
+      "action": "navigate",
+      "target": {
+        "strategy": null,
+        "role_type": null,
+        "selector": null
+      },
+      "data": "https://savingplan.web.app/"
+    },
+    {
+      "step_id": 2,
+      "description": "Fill the login email field",
+      "action": "fill",
+      "target": {
+        "strategy": "css",
+        "role_type": null,
+        "selector": "#loginEmail"
+      },
+      "data": "test@example.com"
+    },
+    {
+      "step_id": 3,
+      "description": "Fill the login password field",
+      "action": "fill",
+      "target": {
+        "strategy": "css",
+        "role_type": null,
+        "selector": "#loginPassword"
+      },
+      "data": "password123"
+    },
+    {
+      "step_id": 4,
+      "description": "Click the login button",
+      "action": "click",
+      "target": {
+        "strategy": "role",
+        "role_type": "button",
+        "selector": "התחבר"
+      },
+      "data": null
+    }
+  ]
+}

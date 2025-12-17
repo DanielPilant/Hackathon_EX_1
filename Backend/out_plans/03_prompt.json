@@ -1,0 +1,4 @@
+{
+  "user_id": "user_9aba8884c3",
+  "prompt_text": "After login (assume user is already authenticated), test navigation between tabs: 'ראשי', 'היסטוריה', 'הגדרות'. Verify each page shows a visible header. Return a JSON plan with at least 9 steps."
+}

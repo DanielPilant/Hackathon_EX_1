@@ -1,0 +1,4 @@
+{
+  "user_id": "user_9aba8884c3",
+  "prompt_text": "Navigate to the site and verify the login page is visible. Verify there are input fields for 'אימייל' and 'סיסמה', and buttons 'התחבר' and 'הירשם'. Return a JSON plan with at least 6 steps."
+}

@@ -1,0 +1,4 @@
+{
+  "user_id": "user_9aba8884c3",
+  "prompt_text": "Test basic validation on the login form: try clicking 'התחבר' with empty fields and verify a validation message or prevented submit. Then fill invalid email (e.g. 'abc') and verify error handling. Return a JSON plan with at least 10 steps."
+}

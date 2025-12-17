@@ -14,7 +14,7 @@ from playwright.async_api import (
 )
 from pydantic import ValidationError
 
-from schemas import Plan, Target, ExecutionResult
+from Automation.schemas import Plan, Target, ExecutionResult
 from visual_fx import RED_HALO_SCRIPT
 
 

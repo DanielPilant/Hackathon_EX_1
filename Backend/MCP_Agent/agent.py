@@ -5,6 +5,8 @@ import re
 from dotenv import load_dotenv
 from agents import Agent, Runner
 from agents.mcp import MCPServerStreamableHttp
+# Fix import to point to the correct location
+from failure_analyzer.planing import generate_expanded_test_plan
 
 # OpenAI SDK exception type (installed because agents uses it under the hood)
 from openai import RateLimitError
@@ -142,7 +144,27 @@ async def main():
             mcp_servers=[server],
         )
 
-        result = await run_with_tpm_fallback(agent, USER_PROMPT, max_attempts=4)
+        #result = await run_with_tpm_fallback(agent, USER_PROMPT, max_attempts=4)
+        # —————— PRE-PLANNING STEP ——————
+        plan = await generate_expanded_test_plan(USER_PROMPT)
+        expanded_plan_text = plan["expanded_plan_text"]
+
+        print("\n==== EXPANDED TEST PLAN ====\n")
+        print(expanded_plan_text)
+        print("\n==== STEP LIST ====\n")
+        for step in plan["expanded_plan_steps"]:
+            print(f"- {step}")
+
+        # Now override the prompt we send to the agent
+        agent_prompt = f"""
+        Expanded Test Plan:
+        {expanded_plan_text}
+
+        Now execute this test plan step by step.
+        """
+
+        # Use this as the prompt for agent execution
+        result = await run_with_tpm_fallback(agent, agent_prompt, max_attempts=4)
 
         print("\n=== FINAL REPORT ===\n")
         print(result.final_output)

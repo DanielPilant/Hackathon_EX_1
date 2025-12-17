@@ -1,0 +1,136 @@
+{
+  "plan": [
+    {
+      "step_id": 1,
+      "description": "Navigate to the saving plan application homepage",
+      "action": "navigate",
+      "target": {
+        "strategy": null,
+        "role_type": null,
+        "selector": null
+      },
+      "data": "https://savingplan.web.app/"
+    },
+    {
+      "step_id": 2,
+      "description": "Click 'Login' button with empty email and password fields to test basic validation",
+      "action": "click",
+      "target": {
+        "strategy": "role",
+        "role_type": "button",
+        "selector": "התחבר"
+      },
+      "data": null
+    },
+    {
+      "step_id": 3,
+      "description": "Wait for a short period to observe any client-side validation messages",
+      "action": "wait",
+      "target": {
+        "strategy": null,
+        "role_type": null,
+        "selector": null
+      },
+      "data": "1000"
+    },
+    {
+      "step_id": 4,
+      "description": "Fill an invalid email format into the email field",
+      "action": "fill",
+      "target": {
+        "strategy": "css",
+        "role_type": null,
+        "selector": "#loginEmail"
+      },
+      "data": "abc"
+    },
+    {
+      "step_id": 5,
+      "description": "Fill a dummy password into the password field",
+      "action": "fill",
+      "target": {
+        "strategy": "css",
+        "role_type": null,
+        "selector": "#loginPassword"
+      },
+      "data": "password123"
+    },
+    {
+      "step_id": 6,
+      "description": "Click 'Login' button to test email format validation",
+      "action": "click",
+      "target": {
+        "strategy": "role",
+        "role_type": "button",
+        "selector": "התחבר"
+      },
+      "data": null
+    },
+    {
+      "step_id": 7,
+      "description": "Wait for a short period to observe any client-side validation messages",
+      "action": "wait",
+      "target": {
+        "strategy": null,
+        "role_type": null,
+        "selector": null
+      },
+      "data": "1000"
+    },
+    {
+      "step_id": 8,
+      "description": "Clear the email field for next validation test",
+      "action": "fill",
+      "target": {
+        "strategy": "css",
+        "role_type": null,
+        "selector": "#loginEmail"
+      },
+      "data": ""
+    },
+    {
+      "step_id": 9,
+      "description": "Clear the password field for next validation test",
+      "action": "fill",
+      "target": {
+        "strategy": "css",
+        "role_type": null,
+        "selector": "#loginPassword"
+      },
+      "data": ""
+    },
+    {
+      "step_id": 10,
+      "description": "Fill a valid email format into the email field",
+      "action": "fill",
+      "target": {
+        "strategy": "css",
+        "role_type": null,
+        "selector": "#loginEmail"
+      },
+      "data": "valid@example.com"
+    },
+    {
+      "step_id": 11,
+      "description": "Click 'Login' button with only email filled (empty password) to test password validation",
+      "action": "click",
+      "target": {
+        "strategy": "role",
+        "role_type": "button",
+        "selector": "התחבר"
+      },
+      "data": null
+    },
+    {
+      "step_id": 12,
+      "description": "Wait for a short period to observe any client-side validation messages",
+      "action": "wait",
+      "target": {
+        "strategy": null,
+        "role_type": null,
+        "selector": null
+      },
+      "data": "1000"
+    }
+  ]
+}

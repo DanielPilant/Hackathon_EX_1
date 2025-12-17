@@ -4,6 +4,8 @@ import re
 import sys
 import time
 import uuid
+import asyncio
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -19,6 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Add parent directory to path for failure_analyzer import
 sys.path.insert(0, str(Path(__file__).parent.parent))
+from Backend.failure_analyzer.goal_planner import generate_goal_execution_plan
 from failure_analyzer import FailureAnalyzer, is_failure_event
 
 app = FastAPI(title="Playwright Agent Server", version="1.0")
@@ -316,7 +319,57 @@ async def send_prompt(session_id: str, req: PromptRequest):
         try:
             composed = _compose_prompt(s, req.prompt)
 
-            run = Runner.run_streamed(s.agent, composed, max_turns=50)
+            #run = Runner.run_streamed(s.agent, composed, max_turns=50)
+            # —————— PRE-PLANNING STEP ——————
+            
+            # —————— PRE-PLANNING STEP (MVP GOAL MODE) ——————
+            plan = await generate_goal_execution_plan(req.prompt, max_attempts=5, max_steps_per_attempt=7)
+            attempts = plan.get("attempts", [])
+
+            print("\n===== GOAL EXECUTION PLAN =====\n")
+            print(json.dumps(plan, ensure_ascii=False, indent=2))
+            print("\n===== END OF PLAN =====\n")
+
+            # Create a compact, execution-focused prompt for the agent
+            attempts_text_lines = []
+            for idx, a in enumerate(attempts, start=1):
+                attempts_text_lines.append(f"ATTEMPT {idx}: {a.get('name','')}".strip())
+                pre = a.get("preconditions") or []
+                if pre:
+                    attempts_text_lines.append("Preconditions: " + "; ".join(pre))
+                steps = a.get("steps") or []
+                for s_idx, step in enumerate(steps, start=1):
+                    attempts_text_lines.append(f"  {s_idx}. {step}")
+                sc = a.get("success_criteria") or []
+                if sc:
+                    attempts_text_lines.append("Success criteria: " + "; ".join(sc))
+                attempts_text_lines.append("Stop condition: " + (a.get("stop_condition") or ""))
+                attempts_text_lines.append("")
+
+            attempts_text = "\n".join(attempts_text_lines).strip()
+
+            final_agent_prompt = f"""
+            You are continuing an existing browser session. Do NOT restart the browser unless absolutely required.
+            Allowed domain: {s.allowed_domain}.
+
+            GOAL:
+            {plan.get("goal", req.prompt)}
+
+            EXECUTION RULES (HARD):
+            - You have up to {len(attempts)} attempts.
+            - Execute attempts in order. If an attempt succeeds, STOP immediately and do not continue.
+            - Do NOT run QA audit checks (negative tests, a11y/security). Only actions that help achieve the goal.
+            - Avoid redundant actions: if you already checked something and the page didn't change, don't repeat it.
+            - Keep outputs short. For each step output PASS/FAIL and a short reason.
+
+            PLAN (attempts):
+            {attempts_text}
+
+            Now execute ATTEMPT 1 step-by-step. After each attempt, decide if success criteria are met.
+            End with STATE: url/title/keys.
+            """.strip()
+            
+            run = Runner.run_streamed(s.agent, final_agent_prompt, max_turns=50)
 
             final_output = None
             collected_events = []  # Collect events for potential failure analysis
