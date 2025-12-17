@@ -198,11 +198,16 @@ export const useTestAgent = () => {
   const userId = sessionId || "Not Connected";
 
   // --- Connection Function ---
-  const connectToUrl = async (url) => {
-    if (!url) return;
+  const connectToUrl = async (inputUrl) => {
+    if (!inputUrl) return;
 
     setIsScanning(true);
     try {
+      let url = inputUrl;
+      if (!/^https?:\/\//i.test(url)) {
+        url = "https://" + url;
+      }
+
       // 1. Extract domain from URL
       const domain = new URL(url).hostname;
       console.log("Hook: Connecting to", url, "Domain:", domain);

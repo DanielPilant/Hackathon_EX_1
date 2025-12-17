@@ -13,47 +13,9 @@ import clsx from "clsx";
 import { GlassCard } from "./ui/GlassCard";
 import { GlowButton } from "./ui/GlowButton";
 
-export const ControlPanel = ({
-  isConnected,
-  isScanning,
-  isRunningTest,
-  isFullScanning,
-  isSuggesting,
-  onConnect,
-  onRunTest,
-  onFullScan,
-  onGenerateSuggestion,
-  className,
-}) => {
-  const [targetUrl, setTargetUrl] = useState("");
-  const [userPrompt, setUserPrompt] = useState("");
-
-  const handleConnect = () => {
-    onConnect(targetUrl);
-  };
-
-  const handleRunTest = () => {
-    onRunTest(userPrompt);
-  };
-
-  const handleSuggestion = async () => {
-    const suggestion = await onGenerateSuggestion();
-    if (suggestion) {
-      setUserPrompt(suggestion);
-    }
-  };
-
-  return (
-    <GlassCard className={clsx("p-6 flex flex-col gap-6", className)} delay={0.2}>
-      {/* Header */}
-      <div className="flex items-center gap-2 pb-4 border-b border-white/5">
-        <Command className="w-5 h-5 text-blue-400" />
-        <h2 className="text-lg font-bold text-white tracking-tight">
-          Mission Control
-        </h2>
-      </div>
-
-      {/* URL Section */}
+const TargetSection = React.memo(
+  ({ targetUrl, setTargetUrl, isConnected, isScanning, onConnect }) => {
+    return (
       <div className="space-y-3">
         <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
           <Globe className="w-3.5 h-3.5" /> Target System
@@ -76,7 +38,7 @@ export const ControlPanel = ({
           </div>
 
           <GlowButton
-            onClick={handleConnect}
+            onClick={() => onConnect(targetUrl)}
             disabled={isConnected || isScanning || !targetUrl}
             className="min-w-[110px]"
             variant={isConnected ? "success" : "primary"}
@@ -104,8 +66,26 @@ export const ControlPanel = ({
           </div>
         )}
       </div>
+    );
+  }
+);
 
-      {/* Prompt Section */}
+const DirectiveSection = React.memo(
+  ({
+    userPrompt,
+    setUserPrompt,
+    isConnected,
+    isSuggesting,
+    onGenerateSuggestion,
+  }) => {
+    const handleSuggestion = async () => {
+      const suggestion = await onGenerateSuggestion();
+      if (suggestion) {
+        setUserPrompt(suggestion);
+      }
+    };
+
+    return (
       <div className="flex-1 flex flex-col space-y-3">
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
@@ -146,6 +126,57 @@ export const ControlPanel = ({
           />
         </div>
       </div>
+    );
+  }
+);
+
+export const ControlPanel = ({
+  isConnected,
+  isScanning,
+  isRunningTest,
+  isFullScanning,
+  isSuggesting,
+  onConnect,
+  onRunTest,
+  onFullScan,
+  onGenerateSuggestion,
+  className,
+}) => {
+  const [targetUrl, setTargetUrl] = useState("");
+  const [userPrompt, setUserPrompt] = useState("");
+
+  const handleRunTest = () => {
+    onRunTest(userPrompt);
+  };
+
+  return (
+    <GlassCard
+      className={clsx("p-6 flex flex-col gap-6", className)}
+      delay={0.2}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-2 pb-4 border-b border-white/5">
+        <Command className="w-5 h-5 text-blue-400" />
+        <h2 className="text-lg font-bold text-white tracking-tight">
+          Mission Control
+        </h2>
+      </div>
+
+      <TargetSection
+        targetUrl={targetUrl}
+        setTargetUrl={setTargetUrl}
+        isConnected={isConnected}
+        isScanning={isScanning}
+        onConnect={onConnect}
+      />
+
+      <DirectiveSection
+        userPrompt={userPrompt}
+        setUserPrompt={setUserPrompt}
+        isConnected={isConnected}
+        isSuggesting={isSuggesting}
+        onGenerateSuggestion={onGenerateSuggestion}
+      />
 
       {/* Action Buttons */}
       <div className="grid grid-cols-2 gap-3 pt-2">
