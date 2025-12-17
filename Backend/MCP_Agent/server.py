@@ -1,9 +1,11 @@
 import asyncio
 import os
 import re
+import sys
 import time
 import uuid
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 from dotenv import load_dotenv
@@ -14,6 +16,10 @@ from agents import Agent, Runner
 from agents.mcp import MCPServerStreamableHttp
 from openai import RateLimitError
 from fastapi.middleware.cors import CORSMiddleware
+
+# Add parent directory to path for failure_analyzer import
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from failure_analyzer import FailureAnalyzer, is_failure_event
 
 app = FastAPI(title="Playwright Agent Server", version="1.0")
 
@@ -163,11 +169,14 @@ SESSIONS: Dict[str, Session] = {}
 # Global MCP connection (kept open)
 MCP_SERVER: Optional[MCPServerStreamableHttp] = None
 
+# Global Failure Analyzer instance
+FAILURE_ANALYZER: Optional[FailureAnalyzer] = None
+
 # FastAPI with lifespan startup/shutdown
 
 @app.on_event("startup")
 async def startup():
-    global MCP_SERVER
+    global MCP_SERVER, FAILURE_ANALYZER
     MCP_SERVER = MCPServerStreamableHttp(
         name="playwright-local",
         params={"url": PLAYWRIGHT_MCP_URL, "timeout": 120},
@@ -176,6 +185,12 @@ async def startup():
     )
     # Open MCP connection ONCE and keep it open
     await MCP_SERVER.__aenter__()
+    
+    # Initialize Failure Analyzer (uses same OpenAI API key from env)
+    FAILURE_ANALYZER = FailureAnalyzer(
+        openai_model=os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+    )
+    print("Failure Analyzer initialized")
 
 
 @app.on_event("shutdown")
@@ -301,9 +316,10 @@ async def send_prompt(session_id: str, req: PromptRequest):
         try:
             composed = _compose_prompt(s, req.prompt)
 
-            run = Runner.run_streamed(s.agent, composed,max_turns=50)
+            run = Runner.run_streamed(s.agent, composed, max_turns=50)
 
             final_output = None
+            collected_events = []  # Collect events for potential failure analysis
 
             async for event in run.stream_events():
                 payload = {
@@ -314,13 +330,45 @@ async def send_prompt(session_id: str, req: PromptRequest):
                 if hasattr(event, "item") and event.item:
                     payload["data"] = str(event.item)
 
-                # 🔴 שידור חי ל־WebSocket
+                # Collect event for failure analysis
+                collected_events.append(payload)
+
+                # Stream live to WebSocket
                 if s.ws:
                     await s.ws.send_json(payload)
-            
+                
+                # Check if this event indicates a failure and analyze it
+                if FAILURE_ANALYZER and is_failure_event(payload):
+                    try:
+                        analysis = await FAILURE_ANALYZER.analyze(payload)
+                        if analysis.get("status") != "ignored_non_failure_log":
+                            # Send failure analysis via WebSocket
+                            if s.ws:
+                                await s.ws.send_json({
+                                    "type": "failure_analysis",
+                                    "data": analysis
+                                })
+                            print(f"Failure analyzed: {analysis.get('failure_category')} - {analysis.get('summary', '')[:50]}")
+                    except Exception as analysis_err:
+                        print(f"Failure analysis error: {analysis_err}")
 
 
             out = (getattr(run, "final_output", None) or "").strip()
+
+            # Check final output for failures as well
+            if FAILURE_ANALYZER and out:
+                final_event = {"type": "final_output", "data": out}
+                if is_failure_event(final_event):
+                    try:
+                        analysis = await FAILURE_ANALYZER.analyze(final_event)
+                        if analysis.get("status") != "ignored_non_failure_log":
+                            if s.ws:
+                                await s.ws.send_json({
+                                    "type": "failure_analysis",
+                                    "data": analysis
+                                })
+                    except Exception as analysis_err:
+                        print(f"Final output analysis error: {analysis_err}")
 
             if s.ws:
                 await s.ws.send_json({
@@ -345,6 +393,25 @@ async def send_prompt(session_id: str, req: PromptRequest):
 
         except Exception as e:
             err = {"type": type(e).__name__, "message": str(e)}
+            
+            # Analyze the exception as a failure
+            if FAILURE_ANALYZER:
+                try:
+                    error_event = {
+                        "type": "error",
+                        "message": str(e),
+                        "error_type": type(e).__name__
+                    }
+                    analysis = await FAILURE_ANALYZER.analyze(error_event)
+                    if analysis.get("status") != "ignored_non_failure_log":
+                        if s.ws:
+                            await s.ws.send_json({
+                                "type": "failure_analysis",
+                                "data": analysis
+                            })
+                except Exception as analysis_err:
+                    print(f"Exception analysis error: {analysis_err}")
+            
             return PromptResponse(ok=False, session_id=session_id, output="", snapshot=s.last_snapshot, error=err)
 
 
