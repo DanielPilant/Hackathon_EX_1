@@ -1,14 +1,18 @@
-import React from "react";
+import React, { useState, memo } from "react";
 import {
   CheckCircle2,
   XCircle,
   AlertCircle,
   Loader2,
   Info,
+  ChevronDown,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import clsx from "clsx";
 
-export const ResultItem = ({ run }) => {
+export const ResultItem = memo(({ run }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   // Determine overall status from steps
   const isFail = run.steps.some((s) => s.status === "fail");
   const isRunning = run.steps.some((s) => s.status === "running");
@@ -57,9 +61,11 @@ export const ResultItem = ({ run }) => {
   const StatusIcon = config.icon;
 
   return (
-    <div
+    <motion.div
+      layout
+      onClick={() => setIsExpanded(!isExpanded)}
       className={clsx(
-        "relative overflow-hidden rounded-xl border transition-all duration-300 group",
+        "relative overflow-hidden rounded-xl border transition-all duration-300 group cursor-pointer",
         config.border,
         config.bg,
         config.glow,
@@ -89,9 +95,17 @@ export const ResultItem = ({ run }) => {
               {run.title || "System Event"}
             </span>
           </div>
-          <span className="text-[10px] font-mono text-gray-400">
-            {run.timestamp}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono text-gray-400">
+              {run.timestamp}
+            </span>
+            <motion.div
+              animate={{ rotate: isExpanded ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ChevronDown className="w-3 h-3 text-gray-400" />
+            </motion.div>
+          </div>
         </div>
 
         {/* Steps / Content */}
@@ -99,21 +113,27 @@ export const ResultItem = ({ run }) => {
           {run.steps.map((step) => (
             <div key={step.id} className="flex flex-col gap-1">
               <div className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-200">
-                <span className="leading-relaxed font-medium">
+                <span className="leading-relaxed font-medium break-words">
                   {step.stepName}
                 </span>
               </div>
 
               {step.description && (
-                <div className="ml-0 text-xs text-gray-500 dark:text-gray-400 bg-black/5 dark:bg-white/5 p-2 rounded border border-black/5 dark:border-white/5 font-mono break-all">
+                <motion.div
+                  layout
+                  className={clsx(
+                    "ml-0 text-xs text-gray-300 bg-zinc-950/50 p-2 rounded border border-white/5 font-mono break-all overflow-hidden",
+                    !isExpanded && "line-clamp-2"
+                  )}
+                >
                   {typeof step.description === "object"
                     ? JSON.stringify(step.description, null, 2)
                     : step.description}
-                </div>
+                </motion.div>
               )}
 
               {step.errorMessage && (
-                <div className="mt-1 flex items-start gap-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded">
+                <div className="mt-1 flex items-start gap-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded break-words">
                   <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
                   <span>{step.errorMessage}</span>
                 </div>
@@ -122,6 +142,6 @@ export const ResultItem = ({ run }) => {
           ))}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
-};
+});
