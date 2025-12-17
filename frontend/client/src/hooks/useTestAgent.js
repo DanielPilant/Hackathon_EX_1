@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { backend } from "../services/backend";
 
 export const useTestAgent = () => {
@@ -9,8 +9,11 @@ export const useTestAgent = () => {
   const [isFullScanning, setIsFullScanning] = useState(false);
   const [testHistory, setTestHistory] = useState([]);
 
+  // Buffer for incoming logs to prevent excessive re-renders
+  const logBufferRef = useRef([]);
+
   // -------------------------------------------
-  // הוספת ה-WebSocket Listener
+  // WebSocket Listener with Batching
   // -------------------------------------------
   useEffect(() => {
     // אם אין סשן, אין לאן להתחבר
@@ -32,7 +35,7 @@ export const useTestAgent = () => {
     ws.onmessage = (event) => {
       try {
         const logData = JSON.parse(event.data);
-        console.log("🚀 [MCP LOG]:", logData);
+        // console.log("🚀 [MCP LOG]:", logData);
 
         // Extract message content
         const message =
@@ -62,7 +65,8 @@ export const useTestAgent = () => {
           ],
         };
 
-        setTestHistory((prev) => [newEntry, ...prev]);
+        // Push to buffer instead of state
+        logBufferRef.current.push(newEntry);
       } catch {
         console.log("Received raw message:", event.data);
       }
@@ -81,6 +85,27 @@ export const useTestAgent = () => {
       ws.close();
     };
   }, [sessionId]); // <--- הפונקציה תרוץ מחדש רק כשה-sessionId משתנה
+
+  // -------------------------------------------
+  // Flush Loop (Interval)
+  // -------------------------------------------
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (logBufferRef.current.length > 0) {
+        const newLogs = [...logBufferRef.current];
+        logBufferRef.current = []; // Clear buffer
+
+        setTestHistory((prev) => {
+          // Combine and limit to last 200 items to prevent memory issues
+          // Note: We prepend new logs because the UI shows newest first
+          const updated = [...newLogs.reverse(), ...prev];
+          return updated.slice(0, 200);
+        });
+      }
+    }, 500); // Flush every 500ms
+
+    return () => clearInterval(intervalId);
+  }, []);
 
   // User ID for display only (Sidebar)
   const userId = sessionId || "Not Connected";
