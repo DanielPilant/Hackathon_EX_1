@@ -1,5 +1,5 @@
-import React from "react";
-import { Clock, List, AlertTriangle, Lightbulb, Terminal } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { Clock, List, AlertTriangle, Lightbulb, Terminal, CheckCircle, Filter } from "lucide-react";
 import { ResultItem } from "./ResultItem";
 import { GlassCard } from "./ui/GlassCard";
 import { AnimatePresence, motion } from "framer-motion";
@@ -62,34 +62,116 @@ const FailureCard = ({ run }) => (
 );
 
 export const ResultsLog = ({ testHistory, isRunningTest }) => {
-  console.log("🎨 Rendering Log List. Items count:", testHistory.length); // <--- Junction C: Render Log
+  const [filter, setFilter] = useState("all");
+
+  // Calculate counts for tabs
+  const counts = useMemo(() => {
+    return testHistory.reduce(
+      (acc, item) => {
+        acc.all++;
+        if (item.status === "fail") acc.fail++;
+        else if (item.status === "pass") acc.pass++;
+        return acc;
+      },
+      { all: 0, pass: 0, fail: 0 }
+    );
+  }, [testHistory]);
+
+  // Filter the logs based on selection
+  const filteredLogs = useMemo(() => {
+    return testHistory.filter((item) => {
+      if (filter === "all") return true;
+      return item.status === filter;
+    });
+  }, [testHistory, filter]);
 
   return (
     <GlassCard className="h-1/2 p-0 flex flex-col overflow-hidden" delay={0.4}>
-      <div className="p-4 border-b border-white/5 flex items-center gap-3 bg-white/5 backdrop-blur-md">
-        <Terminal className="w-4 h-4 text-blue-400" />
-        <h2 className="text-sm font-bold text-white tracking-wide uppercase">
-          Execution Log
-        </h2>
-        <span className="ml-auto text-[10px] font-mono text-blue-300/70 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
-          {testHistory.length} ENTRIES
-        </span>
+      {/* Sticky Header with Filters */}
+      <div className="sticky top-0 z-20 bg-black/40 backdrop-blur-xl border-b border-white/5 p-4 space-y-4">
+        {/* Title Row */}
+        <div className="flex items-center gap-3">
+          <Terminal className="w-4 h-4 text-blue-400" />
+          <h2 className="text-sm font-bold text-white tracking-wide uppercase">
+            Execution Log
+          </h2>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="flex items-center gap-2 p-1 bg-white/5 rounded-lg border border-white/5">
+          {/* All Tab */}
+          <button
+            onClick={() => setFilter("all")}
+            className={`flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${
+              filter === "all"
+                ? "bg-blue-500/20 text-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.2)]"
+                : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+            }`}
+          >
+            <List className="w-3 h-3" />
+            <span>All</span>
+            <span className="bg-white/10 px-1.5 rounded text-[9px]">
+              {counts.all}
+            </span>
+          </button>
+
+          {/* Passed Tab */}
+          <button
+            onClick={() => setFilter("pass")}
+            className={`flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${
+              filter === "pass"
+                ? "bg-emerald-500/20 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+                : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+            }`}
+          >
+            <CheckCircle className="w-3 h-3" />
+            <span>Passed</span>
+            <span className="bg-white/10 px-1.5 rounded text-[9px]">
+              {counts.pass}
+            </span>
+          </button>
+
+          {/* Failed Tab */}
+          <button
+            onClick={() => setFilter("fail")}
+            className={`flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${
+              filter === "fail"
+                ? "bg-red-500/20 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.2)]"
+                : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+            }`}
+          >
+            <AlertTriangle className="w-3 h-3" />
+            <span>Failed</span>
+            <span className="bg-white/10 px-1.5 rounded text-[9px]">
+              {counts.fail}
+            </span>
+          </button>
+        </div>
       </div>
 
-      {testHistory.length === 0 && !isRunningTest ? (
+      {/* Content Area */}
+      {filteredLogs.length === 0 && !isRunningTest ? (
         <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
           <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 border border-white/5">
-            <Clock className="w-8 h-8 opacity-50" />
+            {filter === "all" ? (
+              <Clock className="w-8 h-8 opacity-50" />
+            ) : (
+              <Filter className="w-8 h-8 opacity-50" />
+            )}
           </div>
-          <p className="text-sm font-medium text-slate-400">System Idle</p>
+          <p className="text-sm font-medium text-slate-400">
+            {filter === "all" ? "System Idle" : "No Logs Found"}
+          </p>
           <p className="text-xs text-slate-600 mt-1 font-mono">
-            Waiting for test execution...
+            {filter === "all"
+              ? "Waiting for test execution..."
+              : `No ${filter} events recorded`}
           </p>
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
           <AnimatePresence mode="popLayout">
-            {testHistory.map((run) => (
+            {filteredLogs.map((run) => (
               <motion.div
                 key={run.id}
                 layout

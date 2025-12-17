@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from agents import Agent, Runner
 from agents.mcp import MCPServerStreamableHttp
-from openai import RateLimitError
+from openai import RateLimitError, AsyncOpenAI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Add parent directory to path for failure_analyzer import
@@ -535,6 +535,37 @@ async def send_prompt(session_id: str, req: PromptRequest):
                     print(f"Exception analysis error: {analysis_err}")
             
             return PromptResponse(ok=False, session_id=session_id, output="", snapshot=s.last_snapshot, error=err)
+
+
+@app.post("/sessions/{session_id}/suggest")
+async def suggest_test(session_id: str):
+    session = SESSIONS.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Get context: either the last snapshot or just the allowed domain/url
+    context = f"Allowed Domain: {session.allowed_domain}"
+    if session.last_snapshot:
+        context += f"\nCurrent URL: {session.last_snapshot.get('url')}"
+        context += f"\nPage Title: {session.last_snapshot.get('title')}"
+        context += f"\nVisible Elements: {session.last_snapshot.get('keys')}"
+    
+    try:
+        client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a QA Lead. Based on the provided page context (URL/DOM snapshot), suggest ONE concise, actionable test prompt for a Playwright automation agent. Output ONLY the prompt text. Do not include quotes or explanations."},
+                {"role": "user", "content": f"Context: {context}"}
+            ],
+            max_tokens=60,
+            temperature=0.7
+        )
+        suggestion = response.choices[0].message.content.strip()
+        return {"suggestion": suggestion}
+    except Exception as e:
+        print(f"Suggestion failed: {e}")
+        return {"suggestion": "Verify the page title and main heading."}
 
 
 @app.get("/sessions/{session_id}", response_model=SessionStateResponse)

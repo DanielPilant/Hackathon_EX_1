@@ -15,9 +15,11 @@ function App() {
     isConnected,
     isRunningTest,
     isFullScanning,
+    isSuggesting,
     connectToUrl,
     runPrompt,
     runFullScan,
+    generateSuggestion,
   } = useTestAgent();
 
   return (
@@ -35,9 +37,11 @@ function App() {
             isScanning={isScanning}
             isRunningTest={isRunningTest}
             isFullScanning={isFullScanning}
+            isSuggesting={isSuggesting}
             onConnect={connectToUrl}
             onRunTest={runPrompt}
             onFullScan={runFullScan}
+            onGenerateSuggestion={generateSuggestion}
           />
 
           <div className="flex-1 flex flex-col gap-4 h-full overflow-hidden">

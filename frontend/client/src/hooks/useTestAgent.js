@@ -7,6 +7,7 @@ export const useTestAgent = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [isRunningTest, setIsRunningTest] = useState(false);
   const [isFullScanning, setIsFullScanning] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false);
   const [testHistory, setTestHistory] = useState([]);
 
   // Buffer for incoming logs to prevent excessive re-renders
@@ -256,6 +257,20 @@ export const useTestAgent = () => {
     setTimeout(() => setIsFullScanning(false), 2000);
   };
 
+  const generateSuggestion = async () => {
+    if (!sessionId) return null;
+    setIsSuggesting(true);
+    try {
+      const data = await backend.getSuggestion(sessionId);
+      return data.suggestion;
+    } catch (error) {
+      console.error("Suggestion Error:", error);
+      return null;
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
+
   return {
     sessionId,
     userId,
@@ -264,8 +279,10 @@ export const useTestAgent = () => {
     isConnected,
     isRunningTest,
     isFullScanning,
+    isSuggesting,
     connectToUrl,
     runPrompt,
     runFullScan,
+    generateSuggestion,
   };
 };

@@ -18,9 +18,11 @@ export const ControlPanel = ({
   isScanning,
   isRunningTest,
   isFullScanning,
+  isSuggesting,
   onConnect,
   onRunTest,
   onFullScan,
+  onGenerateSuggestion,
 }) => {
   const [targetUrl, setTargetUrl] = useState("");
   const [userPrompt, setUserPrompt] = useState("");
@@ -31,6 +33,13 @@ export const ControlPanel = ({
 
   const handleRunTest = () => {
     onRunTest(userPrompt);
+  };
+
+  const handleSuggestion = async () => {
+    const suggestion = await onGenerateSuggestion();
+    if (suggestion) {
+      setUserPrompt(suggestion);
+    }
   };
 
   return (
@@ -97,9 +106,27 @@ export const ControlPanel = ({
 
       {/* Prompt Section */}
       <div className="flex-1 flex flex-col space-y-3">
-        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-          <MessageSquare className="w-3.5 h-3.5" /> Directive
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+            <MessageSquare className="w-3.5 h-3.5" /> Directive
+          </label>
+
+          {isConnected && (
+            <button
+              onClick={handleSuggestion}
+              disabled={isSuggesting}
+              className="flex items-center gap-1.5 text-[10px] font-bold text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-wider disabled:opacity-50"
+            >
+              {isSuggesting ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Sparkles className="w-3 h-3" />
+              )}
+              {isSuggesting ? "Thinking..." : "Auto-Suggest"}
+            </button>
+          )}
+        </div>
+
         <div className="relative flex-1 group">
           <div className="absolute inset-0 bg-purple-500/10 rounded-xl blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <textarea
