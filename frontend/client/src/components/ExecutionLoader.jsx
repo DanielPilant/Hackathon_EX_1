@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Cpu, Activity, Radio, ScanLine, Loader2 } from "lucide-react";
+import { Scan, Activity, Target } from "lucide-react";
 
 const LOADING_TEXTS = [
-  "Initializing Neural Link...",
-  "Scanning DOM Structure...",
-  "Analyzing Visual Context...",
-  "Executing Test Protocols...",
-  "Verifying Selectors...",
-  "Processing LLM Response...",
+  "NEURAL LINK ACTIVE",
+  "SCANNING DOM NODES",
+  "ANALYZING VIEWPORT",
+  "EXECUTING PROTOCOL",
+  "VERIFYING SELECTORS",
+  "AWAITING LLM RESPONSE",
 ];
 
 export const ExecutionLoader = () => {
@@ -26,76 +26,68 @@ export const ExecutionLoader = () => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-2xl"
+      className="absolute inset-0 z-50 pointer-events-none overflow-hidden"
     >
-      {/* Main Card */}
-      <div className="relative w-80 p-8 rounded-2xl bg-black/90 border border-white/10 shadow-2xl overflow-hidden flex flex-col items-center gap-6">
-        {/* Background Gradients */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-50" />
-        <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-50" />
+      {/* 1. Active HUD Border (Pulsing) */}
+      <motion.div
+        animate={{ opacity: [0.3, 0.6, 0.3] }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute inset-0 border-[2px] border-blue-500/30 shadow-[inset_0_0_30px_rgba(59,130,246,0.1)]"
+      />
 
-        {/* Scanner Line Animation */}
+      {/* 2. Corner Brackets (The "Targeting" Look) */}
+      <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-blue-400 rounded-tl-lg" />
+      <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-blue-400 rounded-tr-lg" />
+      <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-blue-400 rounded-bl-lg" />
+      <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-blue-400 rounded-br-lg" />
+
+      {/* 3. Subtle Scanner Line (Laser Sweep) */}
+      <motion.div
+        initial={{ top: "-10%" }}
+        animate={{ top: "110%" }}
+        transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+        className="absolute left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-blue-400/50 to-transparent shadow-[0_0_10px_rgba(59,130,246,0.3)]"
+      />
+
+      {/* 4. Status Badge (Top-Right HUD) */}
+      <div className="absolute top-4 right-4 flex items-center gap-3">
+        {/* Blinking Red Recording Dot */}
         <motion.div
-          animate={{ top: ["0%", "100%", "0%"] }}
-          transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-          className="absolute left-0 w-full h-[2px] bg-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.5)] z-0 pointer-events-none"
-        />
+          animate={{ opacity: [1, 0, 1] }}
+          transition={{ duration: 1, repeat: Infinity }}
+          className="flex items-center gap-1.5 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded-md backdrop-blur-md"
+        >
+          <div className="w-1.5 h-1.5 bg-red-500 rounded-full shadow-[0_0_5px_#ef4444]" />
+          <span className="text-[10px] font-mono font-bold text-red-400 tracking-wider">
+            REC
+          </span>
+        </motion.div>
 
-        {/* Central Icon with Pulse */}
-        <div className="relative z-10">
-          <motion.div
-            animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0, 0.3] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="absolute inset-0 bg-blue-500 rounded-full blur-xl"
-          />
-          <div className="relative w-16 h-16 bg-black rounded-full border border-blue-500/30 flex items-center justify-center shadow-[0_0_30px_rgba(59,130,246,0.2)]">
-            <Cpu className="w-8 h-8 text-blue-400" />
-          </div>
-
-          {/* Orbiting Dot */}
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-            className="absolute inset-[-6px] rounded-full border-t-2 border-transparent border-t-blue-500/50"
-          />
-          <motion.div
-            animate={{ rotate: -360 }}
-            transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
-            className="absolute inset-[-12px] rounded-full border-b-2 border-transparent border-b-purple-500/30"
-          />
-        </div>
-
-        {/* Text Animation */}
-        <div className="h-10 flex flex-col items-center justify-center w-full z-10">
-          <AnimatePresence mode="wait">
-            <motion.p
-              key={textIndex}
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
-              className="text-xs font-mono text-blue-200 tracking-widest uppercase text-center"
-            >
-              {LOADING_TEXTS[textIndex]}
-            </motion.p>
-          </AnimatePresence>
-          <div className="flex gap-1 mt-2">
-            <motion.div
-              animate={{ opacity: [0.2, 1, 0.2] }}
-              transition={{ duration: 1, repeat: Infinity, delay: 0 }}
-              className="w-1 h-1 bg-blue-400 rounded-full"
-            />
-            <motion.div
-              animate={{ opacity: [0.2, 1, 0.2] }}
-              transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
-              className="w-1 h-1 bg-blue-400 rounded-full"
-            />
-            <motion.div
-              animate={{ opacity: [0.2, 1, 0.2] }}
-              transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
-              className="w-1 h-1 bg-blue-400 rounded-full"
-            />
+        {/* Main Status Pill */}
+        <div className="flex items-center gap-3 bg-black/60 border border-blue-500/20 px-3 py-1.5 rounded-md backdrop-blur-md shadow-lg">
+          <Activity className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
+          <div className="w-[140px] relative h-4 overflow-hidden">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={textIndex}
+                initial={{ y: 15, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -15, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="absolute inset-0 flex items-center"
+              >
+                <span className="text-[10px] font-mono font-bold text-blue-100 tracking-widest truncate">
+                  {LOADING_TEXTS[textIndex]}
+                </span>
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
+      </div>
+
+      {/* 5. Center Crosshair (Very subtle) */}
+      <div className="absolute inset-0 flex items-center justify-center opacity-20">
+        <Target className="w-12 h-12 text-blue-300 stroke-[0.5]" />
       </div>
     </motion.div>
   );

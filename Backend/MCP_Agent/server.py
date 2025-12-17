@@ -234,9 +234,7 @@ async def process_and_send_log(websocket: WebSocket, payload: Dict[str, Any]):
     
     # אם לא ניתחנו, שולחים רגיל
     try:
-        print(f"📤 SENDING WS PAYLOAD: {payload}")  # <--- Junction A: Debug Print
-        await websocket.send_json(payload)
-        print(f"✅ WS SENT SUCCESS")  # <--- Junction A: Confirmation
+        pass
     except Exception as e:
         print(f"⚠️ Failed to send log via WS: {e}")
 def _assert_domain(url: str, allowed_domain: str):

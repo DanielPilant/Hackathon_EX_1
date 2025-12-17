@@ -31,7 +31,9 @@ export const VideoPlayer = ({ sessionId }) => {
           // כי זה כבר data URL מלא
           setSrc(ev.frame);
         }
-      } catch {}
+      } catch {
+        console.error("VideoPlayer: Failed to parse WS message", e.data);
+      }
     };
 
     // keep-alive קטן כדי שהשרת (שקורא receive_text) יקבל משהו מדי פעם
