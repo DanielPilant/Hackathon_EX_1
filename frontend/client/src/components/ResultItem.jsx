@@ -7,7 +7,6 @@ import {
   Info,
   ChevronDown,
 } from "lucide-react";
-import { motion } from "framer-motion";
 import clsx from "clsx";
 
 export const ResultItem = memo(({ run }) => {
