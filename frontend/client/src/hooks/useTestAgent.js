@@ -67,7 +67,26 @@ export const useTestAgent = () => {
         }
 
         // -------------------------------------------
-        // 2. Handle Standard Logs (Smart Filtering)
+        // 2. Handle Live Execution Steps (The Beautiful Stuff)
+        // -------------------------------------------
+        if (msg.type === "execution_step") {
+          const step = msg.data;
+          const newEntry = {
+            id: Date.now() + Math.random(),
+            type: "step_card", // Custom type for rendering
+            status: step.status || "info", // Use backend status or default to info
+            icon: step.icon,
+            title: step.action,
+            description: step.details,
+            timestamp: step.timestamp,
+            steps: [],
+          };
+          logBufferRef.current.push(newEntry);
+          return;
+        }
+
+        // -------------------------------------------
+        // 3. Handle Standard Logs (Smart Filtering)
         // -------------------------------------------
         const content = msg.content || msg.message || JSON.stringify(msg);
 
@@ -131,10 +150,43 @@ export const useTestAgent = () => {
         logBufferRef.current = []; // Clear buffer
 
         setTestHistory((prev) => {
-          // Combine and limit to last 200 items to prevent memory issues
-          // Note: We prepend new logs because the UI shows newest first
-          const updated = [...newLogs.reverse(), ...prev];
-          return updated.slice(0, 200);
+          let currentList = [...prev];
+
+          // Process new logs from oldest to newest (FIFO)
+          for (const log of newLogs) {
+            const latest = currentList[0]; // The most recent log in history
+
+            // Check for "Processing" grouping
+            // We group if both are "Processing" events
+            const isProcessing = log.title === "Processing";
+            const isLatestProcessing = latest && latest.title === "Processing";
+
+            if (isProcessing && isLatestProcessing) {
+              // MERGE STRATEGY: Update the existing log
+              // 1. Clean up description if needed
+              let description = log.description;
+              if (!description || description === "None") {
+                description = latest.description || "Analyzing...";
+              }
+
+              // 2. Create merged entry
+              const mergedLog = {
+                ...log,
+                description: description,
+                id: latest.id, // Keep ID to prevent UI flickering (React key)
+                timestamp: log.timestamp || latest.timestamp, // Update time
+              };
+
+              // 3. Replace head
+              currentList[0] = mergedLog;
+            } else {
+              // Standard Append
+              currentList.unshift(log);
+            }
+          }
+
+          // Limit history size
+          return currentList.slice(0, 200);
         });
       }
     }, 500); // Flush every 500ms
