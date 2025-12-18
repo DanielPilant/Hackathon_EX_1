@@ -328,6 +328,20 @@ export const useTestAgent = () => {
     }
   };
 
+  const getManualSuggestions = async () => {
+    if (!sessionId) return;
+    try {
+      return await backend.getManualSuggestions(sessionId);
+    } catch (error) {
+      console.error("Failed to get manual suggestions:", error);
+      return [];
+    }
+  };
+
+  const logToTerminal = async (data) => {
+    await backend.logToTerminal(data);
+  };
+
   return {
     sessionId,
     userId,
@@ -341,5 +355,7 @@ export const useTestAgent = () => {
     runPrompt,
     runFullScan,
     generateSuggestion,
+    getManualSuggestions,
+    logToTerminal,
   };
 };

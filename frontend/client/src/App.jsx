@@ -22,6 +22,8 @@ function App() {
     runPrompt,
     runFullScan,
     generateSuggestion,
+    getManualSuggestions,
+    logToTerminal,
   } = useTestAgent();
 
   return (
@@ -33,7 +35,12 @@ function App() {
       <div className="relative z-10 w-full h-full">
         <PanelGroup direction="horizontal">
           {/* Panel A: Sidebar & Mission Control */}
-          <Panel defaultSize={40} minSize={20} maxSize={60} className="flex flex-col h-full overflow-hidden">
+          <Panel
+            defaultSize={40}
+            minSize={20}
+            maxSize={60}
+            className="flex flex-col h-full overflow-hidden"
+          >
             <div className="flex h-full p-4 pr-2 gap-4">
               <Sidebar userId={userId} />
               <ControlPanel
@@ -47,6 +54,8 @@ function App() {
                 onRunTest={runPrompt}
                 onFullScan={runFullScan}
                 onGenerateSuggestion={generateSuggestion}
+                onGetManualSuggestions={getManualSuggestions}
+                onLogToTerminal={logToTerminal}
               />
             </div>
           </Panel>
@@ -57,12 +66,20 @@ function App() {
           </PanelResizeHandle>
 
           {/* Panel B: Main Content Area */}
-          <Panel defaultSize={60} minSize={40} className="flex flex-col h-full overflow-hidden">
+          <Panel
+            defaultSize={60}
+            minSize={40}
+            className="flex flex-col h-full overflow-hidden"
+          >
             <PanelGroup direction="vertical">
               {/* Panel B1: Visual Feed */}
-              <Panel defaultSize={65} minSize={30} className="flex flex-col h-full overflow-hidden p-4 pl-2 pb-2">
+              <Panel
+                defaultSize={65}
+                minSize={30}
+                className="flex flex-col h-full overflow-hidden p-4 pl-2 pb-2"
+              >
                 <div className="relative flex-1 min-h-0 w-full h-full">
-                    <VideoPlayer sessionId={sessionId} />
+                  <VideoPlayer sessionId={sessionId} />
                   <AnimatePresence>
                     {(isRunningTest || isScanning) && <ExecutionLoader />}
                   </AnimatePresence>
@@ -75,7 +92,11 @@ function App() {
               </PanelResizeHandle>
 
               {/* Panel B2: Execution Log */}
-              <Panel defaultSize={35} minSize={10} className="flex flex-col h-full overflow-hidden p-4 pl-2 pt-2">
+              <Panel
+                defaultSize={35}
+                minSize={10}
+                className="flex flex-col h-full overflow-hidden p-4 pl-2 pt-2"
+              >
                 <ResultsLog
                   testHistory={testHistory}
                   isRunningTest={isRunningTest}

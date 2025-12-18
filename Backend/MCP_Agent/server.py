@@ -558,7 +558,8 @@ async def _generate_page_suggestions(session: Session) -> List[dict]:
         content = run.final_output.strip()
         match = re.search(r"(\[.*\])", content, re.DOTALL)
         if match:
-            return json.loads(match.group(1))
+            data = json.loads(match.group(1))
+            return data
     except Exception as e:
         print(f"Discovery error: {e}")
     return []
@@ -922,6 +923,15 @@ async def close_session(session_id: str):
     # Note: closing actual browser/page depends on MCP tool support.
     # For now we just drop the session reference.
     return {"ok": True, "session_id": session_id}
+
+
+class ClientLogRequest(BaseModel):
+    message: Any
+
+@app.post("/client-log")
+async def client_log(req: ClientLogRequest):
+    print(f"\n📱 FRONTEND LOG:\n{json.dumps(req.message, indent=2)}\n")
+    return {"ok": True}
 
 
 

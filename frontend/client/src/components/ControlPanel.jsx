@@ -77,11 +77,21 @@ const DirectiveSection = React.memo(
     isConnected,
     isSuggesting,
     onGenerateSuggestion,
+    onGetManualSuggestions,
+    onLogToTerminal,
   }) => {
     const handleSuggestion = async () => {
       const suggestion = await onGenerateSuggestion();
       if (suggestion) {
         setUserPrompt(suggestion);
+      }
+    };
+
+    const handleManualSuggestions = async () => {
+      const suggestions = await onGetManualSuggestions();
+      console.log("Manual Suggestions JSON:", suggestions);
+      if (onLogToTerminal) {
+        await onLogToTerminal(suggestions);
       }
     };
 
@@ -92,20 +102,32 @@ const DirectiveSection = React.memo(
             <MessageSquare className="w-3.5 h-3.5" /> Directive
           </label>
 
-          {isConnected && (
-            <button
-              onClick={handleSuggestion}
-              disabled={isSuggesting}
-              className="flex items-center gap-1.5 text-[10px] font-bold text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-wider disabled:opacity-50"
-            >
-              {isSuggesting ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                <Sparkles className="w-3 h-3" />
-              )}
-              {isSuggesting ? "Thinking..." : "Auto-Suggest"}
-            </button>
-          )}
+          <div className="flex gap-2">
+            {isConnected && (
+              <button
+                onClick={handleManualSuggestions}
+                className="flex items-center gap-1.5 text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-wider"
+              >
+                <Zap className="w-3 h-3" />
+                Get JSON
+              </button>
+            )}
+
+            {isConnected && (
+              <button
+                onClick={handleSuggestion}
+                disabled={isSuggesting}
+                className="flex items-center gap-1.5 text-[10px] font-bold text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-wider disabled:opacity-50"
+              >
+                {isSuggesting ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3 h-3" />
+                )}
+                {isSuggesting ? "Thinking..." : "Auto-Suggest"}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="relative flex-1 group">
@@ -140,6 +162,8 @@ export const ControlPanel = ({
   onRunTest,
   onFullScan,
   onGenerateSuggestion,
+  onGetManualSuggestions,
+  onLogToTerminal,
   className,
 }) => {
   const [targetUrl, setTargetUrl] = useState("");
@@ -176,6 +200,8 @@ export const ControlPanel = ({
         isConnected={isConnected}
         isSuggesting={isSuggesting}
         onGenerateSuggestion={onGenerateSuggestion}
+        onGetManualSuggestions={onGetManualSuggestions}
+        onLogToTerminal={onLogToTerminal}
       />
 
       {/* Action Buttons */}

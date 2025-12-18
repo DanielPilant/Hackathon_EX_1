@@ -46,4 +46,26 @@ export const backend = {
       throw error;
     }
   },
+
+  // 4. Get Manual Suggestions
+  getManualSuggestions: async (sessionId) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/sessions/${sessionId}/suggestions`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Backend: Get manual suggestions failed:", error);
+      throw error;
+    }
+  },
+
+  // 5. Log to Terminal
+  logToTerminal: async (data) => {
+    try {
+      await axios.post(`${API_BASE_URL}/client-log`, { message: data });
+    } catch (error) {
+      console.error("Backend: Log to terminal failed:", error);
+    }
+  },
 };
