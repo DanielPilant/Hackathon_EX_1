@@ -45,6 +45,7 @@ function App() {
               <Sidebar userId={userId} />
               <ControlPanel
                 className="flex-1 h-full"
+                sessionId={sessionId}
                 isConnected={isConnected}
                 isScanning={isScanning}
                 isRunningTest={isRunningTest}

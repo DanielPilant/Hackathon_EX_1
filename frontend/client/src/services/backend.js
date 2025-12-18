@@ -47,7 +47,7 @@ export const backend = {
     }
   },
 
-  // 4. Get Manual Suggestions
+  // 4. Get Manual Suggestions (Deep Scan)
   getManualSuggestions: async (sessionId) => {
     try {
       const response = await axios.get(
@@ -58,6 +58,11 @@ export const backend = {
       console.error("Backend: Get manual suggestions failed:", error);
       throw error;
     }
+  },
+
+  // Alias for Deep Scan
+  getPageSuggestions: async (sessionId) => {
+    return backend.getManualSuggestions(sessionId);
   },
 
   // 5. Log to Terminal

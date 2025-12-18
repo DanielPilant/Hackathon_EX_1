@@ -12,6 +12,7 @@ import {
 import clsx from "clsx";
 import { GlassCard } from "./ui/GlassCard";
 import { GlowButton } from "./ui/GlowButton";
+import { TestSuggestions } from "./TestSuggestions";
 
 const TargetSection = React.memo(
   ({ targetUrl, setTargetUrl, isConnected, isScanning, onConnect }) => {
@@ -77,8 +78,7 @@ const DirectiveSection = React.memo(
     isConnected,
     isSuggesting,
     onGenerateSuggestion,
-    onGetManualSuggestions,
-    onLogToTerminal,
+    sessionId,
   }) => {
     const handleSuggestion = async () => {
       const suggestion = await onGenerateSuggestion();
@@ -87,50 +87,34 @@ const DirectiveSection = React.memo(
       }
     };
 
-    const handleManualSuggestions = async () => {
-      const suggestions = await onGetManualSuggestions();
-      console.log("Manual Suggestions JSON:", suggestions);
-      if (onLogToTerminal) {
-        await onLogToTerminal(suggestions);
-      }
+    const handleSelectSuggestion = (promptText) => {
+      setUserPrompt(promptText);
     };
 
     return (
-      <div className="flex-1 flex flex-col space-y-3">
-        <div className="flex items-center justify-between">
+      <div className="flex-1 flex flex-col space-y-3 min-h-0">
+        <div className="flex items-center justify-between shrink-0">
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
             <MessageSquare className="w-3.5 h-3.5" /> Directive
           </label>
 
-          <div className="flex gap-2">
-            {isConnected && (
-              <button
-                onClick={handleManualSuggestions}
-                className="flex items-center gap-1.5 text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-wider"
-              >
-                <Zap className="w-3 h-3" />
-                Get JSON
-              </button>
-            )}
-
-            {isConnected && (
-              <button
-                onClick={handleSuggestion}
-                disabled={isSuggesting}
-                className="flex items-center gap-1.5 text-[10px] font-bold text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-wider disabled:opacity-50"
-              >
-                {isSuggesting ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  <Sparkles className="w-3 h-3" />
-                )}
-                {isSuggesting ? "Thinking..." : "Auto-Suggest"}
-              </button>
-            )}
-          </div>
+          {isConnected && (
+            <button
+              onClick={handleSuggestion}
+              disabled={isSuggesting}
+              className="flex items-center gap-1.5 text-[10px] font-bold text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-wider disabled:opacity-50"
+            >
+              {isSuggesting ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Sparkles className="w-3 h-3" />
+              )}
+              {isSuggesting ? "Thinking..." : "Auto-Suggest"}
+            </button>
+          )}
         </div>
 
-        <div className="relative flex-1 group">
+        <div className="relative flex-1 min-h-[100px] group shrink-0">
           <div className="absolute inset-0 bg-purple-500/10 rounded-xl blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <textarea
             value={userPrompt}
@@ -147,6 +131,16 @@ const DirectiveSection = React.memo(
             )}
           />
         </div>
+
+        {/* Deep Scan & Suggestions */}
+        {isConnected && (
+          <div className="flex-1 min-h-0 mt-2">
+            <TestSuggestions
+              sessionId={sessionId}
+              onSelectSuggestion={handleSelectSuggestion}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -162,9 +156,8 @@ export const ControlPanel = ({
   onRunTest,
   onFullScan,
   onGenerateSuggestion,
-  onGetManualSuggestions,
-  onLogToTerminal,
   className,
+  sessionId,
 }) => {
   const [targetUrl, setTargetUrl] = useState("");
   const [userPrompt, setUserPrompt] = useState("");
@@ -200,8 +193,7 @@ export const ControlPanel = ({
         isConnected={isConnected}
         isSuggesting={isSuggesting}
         onGenerateSuggestion={onGenerateSuggestion}
-        onGetManualSuggestions={onGetManualSuggestions}
-        onLogToTerminal={onLogToTerminal}
+        sessionId={sessionId}
       />
 
       {/* Action Buttons */}
