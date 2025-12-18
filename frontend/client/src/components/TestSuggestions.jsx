@@ -7,17 +7,60 @@ import {
   Scan,
   Loader2,
   Zap,
+  List,
 } from "lucide-react";
 import clsx from "clsx";
 import { backend } from "../services/backend";
+
+const FIXED_TESTS = [
+  {
+    id: "fixed-1",
+    title: "Verify Initial Page Load",
+    description:
+      "Navigate to the page URL and verify that the page loads successfully without network failures, blank screens, or infinite loading states. Confirm that visible content is rendered within a reasonable time."
+  },
+  {
+    id: "fixed-2",
+    title: "Check Page Title Presence",
+    description:
+      "Verify that the page contains a visible main title or heading that represents the purpose of the page. Ensure the title text is not empty and is clearly readable."
+  },
+  {
+    id: "fixed-3",
+    title: "Validate HTTP Status Code",
+    description:
+      "Ensure that the page responds with a successful HTTP status code (200) and does not return error responses such as 404, 500, or unexpected redirects."
+  },
+  {
+    id: "fixed-4",
+    title: "Check Broken Links",
+    description:
+      "Scan all visible links on the page and verify that each link leads to a valid destination without returning 404 or other client/server errors."
+  },
+  {
+    id: "fixed-5",
+    title: "Verify Navigation Menu Functionality",
+    description:
+      "Check that the main navigation menu is visible and that clicking each navigation item results in a valid page change or interaction."
+  },
+  {
+    id: "fixed-6",
+    title: "Mobile Viewport Responsiveness",
+    description:
+      "Resize the viewport to a mobile screen size and verify that the layout adapts correctly without overlapping elements, horizontal scrolling, or hidden critical content."
+  }
+];
+
 
 export const TestSuggestions = ({ sessionId, onSelectSuggestion }) => {
   const [suggestions, setSuggestions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState("scan"); // 'scan' | 'fixed'
 
   const handleScan = async () => {
     if (!sessionId) return;
+    setActiveTab("scan");
 
     setIsLoading(true);
     setError(null);
@@ -42,6 +85,8 @@ export const TestSuggestions = ({ sessionId, onSelectSuggestion }) => {
     }
   };
 
+  const displayedSuggestions = activeTab === "fixed" ? FIXED_TESTS : suggestions;
+
   return (
     <div className="flex flex-col h-full min-h-0 bg-black/20 rounded-xl border border-white/5 overflow-hidden backdrop-blur-sm">
       {/* Header */}
@@ -52,30 +97,62 @@ export const TestSuggestions = ({ sessionId, onSelectSuggestion }) => {
             Test Suggestions
           </span>
         </div>
-        <button
-          onClick={handleScan}
-          disabled={isLoading || !sessionId}
-          className={clsx(
-            "flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all",
-            isLoading || !sessionId
-              ? "text-slate-500 cursor-not-allowed"
-              : "text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+
+        <div className="flex items-center gap-2">
+          <div className="flex bg-black/40 rounded-lg p-0.5 border border-white/5">
+            <button
+              onClick={() => setActiveTab("scan")}
+              className={clsx(
+                "px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1",
+                activeTab === "scan"
+                  ? "bg-blue-500/20 text-blue-300 shadow-sm"
+                  : "text-slate-500 hover:text-slate-300"
+              )}
+            >
+              <Scan className="w-3 h-3" />
+              Scan
+            </button>
+            <button
+              onClick={() => setActiveTab("fixed")}
+              className={clsx(
+                "px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1",
+                activeTab === "fixed"
+                  ? "bg-blue-500/20 text-blue-300 shadow-sm"
+                  : "text-slate-500 hover:text-slate-300"
+              )}
+            >
+              <List className="w-3 h-3" />
+              Fixed
+            </button>
+          </div>
+
+          {activeTab === "scan" && (
+            <button
+              onClick={handleScan}
+              disabled={isLoading || !sessionId}
+              className={clsx(
+                "flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all border border-white/5",
+                isLoading || !sessionId
+                  ? "text-slate-500 cursor-not-allowed bg-white/5"
+                  : "text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 bg-blue-500/5"
+              )}
+              title="Run Deep Scan"
+            >
+              {isLoading ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Zap className="w-3 h-3" />
+              )}
+            </button>
           )}
-        >
-          {isLoading ? (
-            <Loader2 className="w-3 h-3 animate-spin" />
-          ) : (
-            <Scan className="w-3 h-3" />
-          )}
-          {isLoading ? "Scanning..." : "Deep Scan"}
-        </button>
+        </div>
       </div>
 
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar relative">
         <AnimatePresence mode="popLayout">
           {/* Empty State */}
-          {!isLoading && suggestions.length === 0 && !error && (
+          {activeTab === "scan" && !isLoading && suggestions.length === 0 && !error && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -91,7 +168,7 @@ export const TestSuggestions = ({ sessionId, onSelectSuggestion }) => {
           )}
 
           {/* Error State */}
-          {error && (
+          {error && activeTab === "scan" && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -102,7 +179,7 @@ export const TestSuggestions = ({ sessionId, onSelectSuggestion }) => {
           )}
 
           {/* Loading Skeleton */}
-          {isLoading && (
+          {isLoading && activeTab === "scan" && (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
                 <motion.div
@@ -118,7 +195,7 @@ export const TestSuggestions = ({ sessionId, onSelectSuggestion }) => {
           )}
 
           {/* Suggestions List */}
-          {suggestions.map((suggestion, index) => (
+          {displayedSuggestions.map((suggestion, index) => (
             <motion.button
               key={suggestion.id || index}
               layout
