@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ShieldAlert,
@@ -52,7 +52,12 @@ const FIXED_TESTS = [
 ];
 
 
-export const TestSuggestions = ({ sessionId, onSelectSuggestion }) => {
+export const TestSuggestions = ({
+  sessionId,
+  onSelectSuggestion,
+  shouldTriggerScan,
+  setShouldTriggerScan,
+}) => {
   const [suggestions, setSuggestions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -84,6 +89,16 @@ export const TestSuggestions = ({ sessionId, onSelectSuggestion }) => {
       setIsLoading(false);
     }
   };
+
+  // Effect to trigger scan when shouldTriggerScan is true
+  useEffect(() => {
+    if (shouldTriggerScan) {
+      handleScan();
+      if (setShouldTriggerScan) {
+        setShouldTriggerScan(false);
+      }
+    }
+  }, [shouldTriggerScan, sessionId]);
 
   const displayedSuggestions = activeTab === "fixed" ? FIXED_TESTS : suggestions;
 

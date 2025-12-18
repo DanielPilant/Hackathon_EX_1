@@ -9,6 +9,7 @@ export const useTestAgent = () => {
   const [isFullScanning, setIsFullScanning] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [testHistory, setTestHistory] = useState([]);
+  const [shouldTriggerScan, setShouldTriggerScan] = useState(false);
 
   // Buffer for incoming logs to prevent excessive re-renders
   const logBufferRef = useRef([]);
@@ -315,14 +316,17 @@ export const useTestAgent = () => {
   };
 
   const generateSuggestion = async () => {
-    if (!sessionId) return null;
+    if (!sessionId) return;
+
     setIsSuggesting(true);
     try {
-      const data = await backend.getSuggestion(sessionId);
-      return data.suggestion;
+      // Trigger the scan in TestSuggestions component via state/prop
+      // Since TestSuggestions is a child of ControlPanel, we need a way to signal it.
+      // For now, we'll return a signal that the UI can use.
+      return "TRIGGER_SCAN";
     } catch (error) {
       console.error("Suggestion Error:", error);
-      return null;
+      alert("Failed to generate suggestion.");
     } finally {
       setIsSuggesting(false);
     }
@@ -357,5 +361,7 @@ export const useTestAgent = () => {
     generateSuggestion,
     getManualSuggestions,
     logToTerminal,
+    shouldTriggerScan,
+    setShouldTriggerScan,
   };
 };

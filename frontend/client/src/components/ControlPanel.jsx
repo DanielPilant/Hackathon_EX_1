@@ -79,6 +79,8 @@ const DirectiveSection = React.memo(
     isSuggesting,
     onGenerateSuggestion,
     sessionId,
+    shouldTriggerScan,
+    setShouldTriggerScan,
   }) => {
     const handleSuggestion = async () => {
       const suggestion = await onGenerateSuggestion();
@@ -138,6 +140,8 @@ const DirectiveSection = React.memo(
             <TestSuggestions
               sessionId={sessionId}
               onSelectSuggestion={handleSelectSuggestion}
+              shouldTriggerScan={shouldTriggerScan}
+              setShouldTriggerScan={setShouldTriggerScan}
             />
           </div>
         )}
@@ -158,12 +162,18 @@ export const ControlPanel = ({
   onGenerateSuggestion,
   className,
   sessionId,
+  shouldTriggerScan,
+  setShouldTriggerScan,
 }) => {
   const [targetUrl, setTargetUrl] = useState("");
   const [userPrompt, setUserPrompt] = useState("");
 
   const handleRunTest = () => {
     onRunTest(userPrompt);
+  };
+
+  const handleDeepScanClick = () => {
+    setShouldTriggerScan(true);
   };
 
   return (
@@ -194,6 +204,8 @@ export const ControlPanel = ({
         isSuggesting={isSuggesting}
         onGenerateSuggestion={onGenerateSuggestion}
         sessionId={sessionId}
+        shouldTriggerScan={shouldTriggerScan}
+        setShouldTriggerScan={setShouldTriggerScan}
       />
 
       {/* Action Buttons */}
@@ -209,16 +221,16 @@ export const ControlPanel = ({
         </GlowButton>
 
         <GlowButton
-          onClick={onFullScan}
-          disabled={!isConnected || isFullScanning}
+          onClick={handleDeepScanClick}
+          disabled={!isConnected || isSuggesting}
           variant="secondary"
-          icon={isFullScanning ? Loader2 : Sparkles}
+          icon={isSuggesting ? Loader2 : Sparkles}
           className={clsx(
             "bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/30 text-purple-300",
-            isFullScanning && "animate-pulse"
+            isSuggesting && "animate-pulse"
           )}
         >
-          {isFullScanning ? "Scanning..." : "Auto-Scan"}
+          {isSuggesting ? "Scanning..." : "Deep Scan"}
         </GlowButton>
       </div>
     </GlassCard>

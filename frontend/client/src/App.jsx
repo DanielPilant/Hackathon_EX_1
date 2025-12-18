@@ -24,6 +24,8 @@ function App() {
     generateSuggestion,
     getManualSuggestions,
     logToTerminal,
+    shouldTriggerScan,
+    setShouldTriggerScan,
   } = useTestAgent();
 
   return (
@@ -57,6 +59,8 @@ function App() {
                 onGenerateSuggestion={generateSuggestion}
                 onGetManualSuggestions={getManualSuggestions}
                 onLogToTerminal={logToTerminal}
+                shouldTriggerScan={shouldTriggerScan}
+                setShouldTriggerScan={setShouldTriggerScan}
               />
             </div>
           </Panel>
