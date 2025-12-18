@@ -137,7 +137,6 @@ class CreateSessionRequest(BaseModel):
 class CreateSessionResponse(BaseModel):
     session_id: str
     snapshot: Optional[dict] = None
-    suggestions: Optional[List[TestSuggestion]] = []
 
 class PromptRequest(BaseModel):
     prompt: str
@@ -697,9 +696,8 @@ async def create_session(req: CreateSessionRequest):
         out = (run.final_output or "").strip()
         s.history.append(out[:1200])
         s.last_snapshot = _extract_state_block(out)
-        suggestions_data = await _generate_page_suggestions(s)
 
-    return CreateSessionResponse(session_id=session_id, snapshot=s.last_snapshot, suggestions=suggestions_data)
+    return CreateSessionResponse(session_id=session_id, snapshot=s.last_snapshot)
 
 
 @app.post("/sessions/{session_id}/prompt", response_model=PromptResponse)
