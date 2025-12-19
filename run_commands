@@ -1,0 +1,19 @@
+להריץ את האתר 
+npm run dev
+מתוך התיקיה 
+frontend/client/
+
+
+
+
+
+להריץ את המודל של ה MCP 
+npx @playwright/mcp@latest --port 8931 --headless
+מתוך התיקיית השורש
+
+
+
+להריץ את השרת backend
+fastapi dev server.py
+מתוך התיקיה
+Backend/MCP_Agent
