@@ -104,8 +104,8 @@ def _setup_metrics() -> None:
     Instrumentator().instrument(app).expose(app, include_in_schema=False, endpoint="/metrics")
     logger.info("Metrics endpoint enabled at /metrics")
 
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5-mini")  # או gpt-4.1-mini
-print("✅ DEFAULT_MODEL =", DEFAULT_MODEL)
+DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+logger.info("DEFAULT_MODEL = %s", DEFAULT_MODEL)
 
 # --- הוספת CORS ---
 origins = _env_csv(
