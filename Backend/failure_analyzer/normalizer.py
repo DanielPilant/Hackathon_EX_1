@@ -27,6 +27,8 @@ LOCATOR_PATTERNS = [
     r'role=([^\s"\']+)',  # role=button
     r'selector[:\s]+["\']?([^"\'>\s]+)',  # selector: ".btn"
     r'\[data-testid=["\']([^"\']+)["\']\]',  # [data-testid="submit"]
+    r'#([A-Za-z][\w-]*)',  # #submitBtn
+    r'\.([A-Za-z][\w-]*)',  # .btn-primary
 ]
 
 
