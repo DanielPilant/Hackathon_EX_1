@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Monitor, Signal, WifiOff } from "lucide-react";
 import { GlassCard } from "./ui/GlassCard";
 import clsx from "clsx";
+import { buildWsCandidates } from "../config";
 
 export const VideoPlayer = ({ sessionId }) => {
   const [src, setSrc] = useState("");
@@ -16,35 +17,63 @@ export const VideoPlayer = ({ sessionId }) => {
       return;
     }
 
-    const ws = new WebSocket(
-      `ws://127.0.0.1:8000/ws/sessions/${sessionId}/frames`
-    );
+    const candidates = buildWsCandidates(`/ws/sessions/${sessionId}/frames`);
+    let ws;
+    let candidateIndex = 0;
+    let connected = false;
 
-    ws.onopen = () => setConnected(true);
-    ws.onclose = () => setConnected(false);
-    ws.onerror = () => setConnected(false);
-
-    ws.onmessage = (e) => {
-      try {
-        const ev = JSON.parse(e.data);
-
-        if (ev?.type === "frame") {
-          // Format A: server sends full data URL in "frame"
-          if (ev.frame) {
-            setSrc(ev.frame);
-            return;
-          }
-
-          // Format B: server sends { mime, data(base64) }
-          if (ev.mime && ev.data) {
-            setSrc(`data:${ev.mime};base64,${ev.data}`);
-            return;
-          }
-        }
-      } catch {
-        console.error("VideoPlayer: Failed to parse WS message", e.data);
+    const openCandidate = () => {
+      if (candidateIndex >= candidates.length) {
+        setConnected(false);
+        console.error("VideoPlayer: all frame WS endpoints failed", candidates);
+        return;
       }
+
+      const wsUrl = candidates[candidateIndex++];
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        connected = true;
+        setConnected(true);
+      };
+
+      ws.onclose = () => {
+        if (!connected) {
+          openCandidate();
+          return;
+        }
+        setConnected(false);
+      };
+
+      ws.onerror = () => {
+        if (!connected) {
+          console.debug("Frames WS probe failed, trying next endpoint...");
+        }
+        setConnected(false);
+      };
+
+      ws.onmessage = (e) => {
+        try {
+          const ev = JSON.parse(e.data);
+
+          if (ev?.type === "frame") {
+            if (ev.frame) {
+              setSrc(ev.frame);
+              return;
+            }
+
+            if (ev.mime && ev.data) {
+              setSrc(`data:${ev.mime};base64,${ev.data}`);
+              return;
+            }
+          }
+        } catch {
+          console.error("VideoPlayer: Failed to parse WS message", e.data);
+        }
+      };
     };
+
+    openCandidate();
 
     // keep-alive קטן כדי שהשרת יקבל משהו מדי פעם
     const heartbeat = setInterval(() => {
@@ -53,7 +82,9 @@ export const VideoPlayer = ({ sessionId }) => {
 
     return () => {
       clearInterval(heartbeat);
-      ws.close();
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
     };
   }, [sessionId]);
 

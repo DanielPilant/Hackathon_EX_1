@@ -1,7 +1,7 @@
 import axios from "axios";
+import { API_BASE_URL } from "./config";
 
 // זו הכתובת של הבאקנד החדש שלך (המוח)
-const API_BASE_URL = "http://localhost:8000";
 
 export const apiService = {
   // פונקציה 1: מתחילה שיחה חדשה

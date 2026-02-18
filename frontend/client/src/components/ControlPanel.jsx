@@ -14,6 +14,20 @@ import { GlassCard } from "./ui/GlassCard";
 import { GlowButton } from "./ui/GlowButton";
 import { TestSuggestions } from "./TestSuggestions";
 
+const getDisplayHostname = (value) => {
+  if (!value) return "unknown-host";
+
+  try {
+    return new URL(value).hostname;
+  } catch {
+    try {
+      return new URL(`https://${value}`).hostname;
+    } catch {
+      return value;
+    }
+  }
+};
+
 const TargetSection = React.memo(
   ({ targetUrl, setTargetUrl, isConnected, isScanning, onConnect }) => {
     return (
@@ -63,7 +77,7 @@ const TargetSection = React.memo(
         {isConnected && (
           <div className="text-xs text-emerald-400 flex items-center gap-2 font-mono bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20">
             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-            UPLINK ESTABLISHED :: {new URL(targetUrl).hostname}
+            UPLINK ESTABLISHED :: {getDisplayHostname(targetUrl)}
           </div>
         )}
       </div>

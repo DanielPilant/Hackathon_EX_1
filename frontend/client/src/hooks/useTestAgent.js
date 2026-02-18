@@ -1,5 +1,19 @@
 import { useState, useEffect, useRef } from "react";
 import { backend } from "../services/backend";
+import { buildWsCandidates } from "../config";
+
+const safeHostname = (value) => {
+  if (!value) return "";
+  try {
+    return new URL(value).hostname;
+  } catch {
+    try {
+      return new URL(`https://${value}`).hostname;
+    } catch {
+      return "";
+    }
+  }
+};
 
 export const useTestAgent = () => {
   const [sessionId, setSessionId] = useState(null);
@@ -24,120 +38,139 @@ export const useTestAgent = () => {
     console.log(`🔌 Opening WebSocket for session: ${sessionId}`);
 
     // יצירת החיבור
-    const ws = new WebSocket(`ws://localhost:8000/ws/sessions/${sessionId}`);
+    const candidates = buildWsCandidates(`/ws/sessions/${sessionId}`);
+    let ws;
+    let candidateIndex = 0;
+    let connected = false;
 
-    // כשהחיבור נפתח
-    ws.onopen = () => {
-      console.log("✅ WS Connected!");
-      // אופציונלי: שליחת פינג ראשוני
-      // ws.send("ping");
-    };
+    const openCandidate = () => {
+      if (candidateIndex >= candidates.length) {
+        console.error("❌ WS: all endpoints failed", candidates);
+        return;
+      }
 
-    // כשמתקבלת הודעה מהשרת (לוגים של MCP)
-    ws.onmessage = (event) => {
-      try {
-        console.log("🔥 RAW WS MESSAGE:", event.data); // <--- Junction B: Raw Log
-        const msg = JSON.parse(event.data);
-        console.log("🧩 PARSED TYPE:", msg.type); // <--- Junction B: Parsed Type
+      const wsUrl = candidates[candidateIndex++];
+      console.log(`🔌 Trying WS endpoint: ${wsUrl}`);
+      ws = new WebSocket(wsUrl);
 
-        // -------------------------------------------
-        // 1. Handle Failure Analysis (The Good Stuff)
-        // -------------------------------------------
-        if (msg.type === "failure_analysis") {
-          const analysis = msg.data;
+      ws.onopen = () => {
+        connected = true;
+        console.log("✅ WS Connected!");
+      };
 
-          // FILTER: Skip low-quality "UNKNOWN" analyses
-          if (analysis.failure_category === "UNKNOWN") {
-            console.debug("Skipped UNKNOWN failure analysis");
+      ws.onmessage = (event) => {
+        try {
+          console.log("🔥 RAW WS MESSAGE:", event.data); // <--- Junction B: Raw Log
+          const msg = JSON.parse(event.data);
+          console.log("🧩 PARSED TYPE:", msg.type); // <--- Junction B: Parsed Type
+
+          // -------------------------------------------
+          // 1. Handle Failure Analysis (The Good Stuff)
+          // -------------------------------------------
+          if (msg.type === "failure_analysis") {
+            const analysis = msg.data;
+
+            // FILTER: Skip low-quality "UNKNOWN" analyses
+            if (analysis.failure_category === "UNKNOWN") {
+              console.debug("Skipped UNKNOWN failure analysis");
+              return;
+            }
+
+            const newEntry = {
+              id: Date.now() + Math.random(),
+              type: "failure_card", // Custom type for rendering
+              status: "fail", // Triggers red styling
+              title: analysis.failure_category || "Unknown Failure",
+              summary: analysis.summary,
+              fix: analysis.suggested_fix,
+              reason: analysis.why,
+              timestamp: new Date().toLocaleTimeString(),
+              steps: [], // Empty steps as we render a custom card
+            };
+            logBufferRef.current.push(newEntry);
             return;
           }
 
+          // -------------------------------------------
+          // 2. Handle Live Execution Steps (The Beautiful Stuff)
+          // -------------------------------------------
+          if (msg.type === "execution_step") {
+            const step = msg.data;
+            const newEntry = {
+              id: Date.now() + Math.random(),
+              type: "step_card", // Custom type for rendering
+              status: step.status || "info", // Use backend status or default to info
+              icon: step.icon,
+              title: step.action,
+              description: step.details,
+              timestamp: step.timestamp,
+              steps: [],
+            };
+            logBufferRef.current.push(newEntry);
+            return;
+          }
+
+          // -------------------------------------------
+          // 3. Handle Standard Logs (Smart Filtering)
+          // -------------------------------------------
+          const content = msg.content || msg.message || JSON.stringify(msg);
+
+          if (/error|fail|timeout|exception/i.test(content)) {
+            return;
+          }
+
+          let status = "info";
+          if (/pass|success/i.test(content)) status = "pass";
+          else if (/processing|running|start/i.test(content)) status = "running";
+
           const newEntry = {
             id: Date.now() + Math.random(),
-            type: "failure_card", // Custom type for rendering
-            status: "fail", // Triggers red styling
-            title: analysis.failure_category || "Unknown Failure",
-            summary: analysis.summary,
-            fix: analysis.suggested_fix,
-            reason: analysis.why,
-            timestamp: new Date().toLocaleTimeString(),
-            steps: [], // Empty steps as we render a custom card
+            title: "System Event",
+            timestamp: new Date().toLocaleString(),
+            isLog: true,
+            steps: [
+              {
+                id: Date.now(),
+                stepName: content,
+                status: status,
+                description: msg.details || "",
+                timestamp: new Date().toLocaleTimeString(),
+                duration: "0.1s",
+              },
+            ],
           };
+
+          console.log("✅ Adding to State:", newEntry); // <--- Junction B: State Update Log
           logBufferRef.current.push(newEntry);
+        } catch {
+          console.log("Received raw message:", event.data);
+        }
+      };
+
+      ws.onerror = (error) => {
+        if (connected) {
+          console.error("❌ WS Error:", error);
+        } else {
+          console.debug("WS probe failed, trying next endpoint...");
+        }
+      };
+
+      ws.onclose = () => {
+        if (!connected) {
+          openCandidate();
           return;
         }
-
-        // -------------------------------------------
-        // 2. Handle Live Execution Steps (The Beautiful Stuff)
-        // -------------------------------------------
-        if (msg.type === "execution_step") {
-          const step = msg.data;
-          const newEntry = {
-            id: Date.now() + Math.random(),
-            type: "step_card", // Custom type for rendering
-            status: step.status || "info", // Use backend status or default to info
-            icon: step.icon,
-            title: step.action,
-            description: step.details,
-            timestamp: step.timestamp,
-            steps: [],
-          };
-          logBufferRef.current.push(newEntry);
-          return;
-        }
-
-        // -------------------------------------------
-        // 3. Handle Standard Logs (Smart Filtering)
-        // -------------------------------------------
-        const content = msg.content || msg.message || JSON.stringify(msg);
-
-        // FILTER LOGIC:
-        // If it looks like a raw error/failure, IGNORE IT.
-        // We trust the "failure_analysis" event to handle it beautifully.
-        if (/error|fail|timeout|exception/i.test(content)) {
-          return;
-        }
-
-        // Otherwise, display as info/pass
-        let status = "info";
-        if (/pass|success/i.test(content)) status = "pass";
-        else if (/processing|running|start/i.test(content)) status = "running";
-
-        const newEntry = {
-          id: Date.now() + Math.random(),
-          title: "System Event",
-          timestamp: new Date().toLocaleString(),
-          isLog: true,
-          steps: [
-            {
-              id: Date.now(),
-              stepName: content,
-              status: status,
-              description: msg.details || "",
-              timestamp: new Date().toLocaleTimeString(),
-              duration: "0.1s",
-            },
-          ],
-        };
-
-        console.log("✅ Adding to State:", newEntry); // <--- Junction B: State Update Log
-        logBufferRef.current.push(newEntry);
-      } catch {
-        console.log("Received raw message:", event.data);
-      }
+        console.log("🔌 WS Disconnected");
+      };
     };
 
-    ws.onerror = (error) => {
-      console.error("❌ WS Error:", error);
-    };
-
-    ws.onclose = () => {
-      console.log("🔌 WS Disconnected");
-    };
+    openCandidate();
 
     // Cleanup: סגירת החיבור כשהקומפוננטה יורדת או כשהסשן מתחלף
     return () => {
-      ws.close();
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
     };
   }, [sessionId]); // <--- הפונקציה תרוץ מחדש רק כשה-sessionId משתנה
 
@@ -210,7 +243,10 @@ export const useTestAgent = () => {
       }
 
       // 1. Extract domain from URL
-      const domain = new URL(url).hostname;
+      const domain = safeHostname(url);
+      if (!domain) {
+        throw new Error("Invalid target URL");
+      }
       console.log("Hook: Connecting to", url, "Domain:", domain);
 
       // 2. Call backend API
@@ -319,17 +355,11 @@ export const useTestAgent = () => {
     if (!sessionId) return;
 
     setIsSuggesting(true);
-    try {
-      // Trigger the scan in TestSuggestions component via state/prop
-      // Since TestSuggestions is a child of ControlPanel, we need a way to signal it.
-      // For now, we'll return a signal that the UI can use.
-      return "TRIGGER_SCAN";
-    } catch (error) {
-      console.error("Suggestion Error:", error);
-      alert("Failed to generate suggestion.");
-    } finally {
-      setIsSuggesting(false);
-    }
+    // Trigger the scan in TestSuggestions component via state/prop
+    // Since TestSuggestions is a child of ControlPanel, we need a way to signal it.
+    // For now, we'll return a signal that the UI can use.
+    setIsSuggesting(false);
+    return "TRIGGER_SCAN";
   };
 
   const getManualSuggestions = async () => {

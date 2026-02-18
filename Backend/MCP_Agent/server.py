@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import re
 import sys
@@ -11,11 +12,20 @@ from typing import Dict, List, Optional, Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from pythonjsonlogger import jsonlogger
+from prometheus_fastapi_instrumentator import Instrumentator
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.logging import LoggingInstrumentor
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from pydantic import BaseModel, Field
 
 from agents import Agent, Runner
 from agents.mcp import MCPServerStreamableHttp
-from openai import RateLimitError, AsyncOpenAI
+from openai import RateLimitError, AuthenticationError, APIStatusError, AsyncOpenAI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Add parent directory to path for failure_analyzer import
@@ -24,14 +34,84 @@ from failure_analyzer import FailureAnalyzer, is_failure_event
 
 app = FastAPI(title="Playwright Agent Server", version="1.0")
 
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    val = os.getenv(name)
+    if val is None:
+        return default
+    return val.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_csv(name: str, default: str) -> List[str]:
+    value = os.getenv(name, default)
+    return [part.strip() for part in value.split(",") if part.strip()]
+
+
+load_dotenv()
+
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_FORMAT = os.getenv("LOG_FORMAT", "text").lower()
+ENABLE_METRICS = _env_bool("ENABLE_METRICS", True)
+ENABLE_TRACING = _env_bool("ENABLE_TRACING", True)
+
+if LOG_FORMAT == "json":
+    handler = logging.StreamHandler()
+    formatter = jsonlogger.JsonFormatter("%(asctime)s %(levelname)s %(name)s %(message)s")
+    handler.setFormatter(formatter)
+    logging.basicConfig(level=LOG_LEVEL, handlers=[handler])
+else:
+    logging.basicConfig(level=LOG_LEVEL)
+
+logger = logging.getLogger("mcp_api")
+
+
+def _setup_tracing() -> None:
+    if not ENABLE_TRACING:
+        logger.info("Tracing disabled via ENABLE_TRACING")
+        return
+
+    service_name = os.getenv("OTEL_SERVICE_NAME", "mcp-api")
+    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+    insecure = _env_bool("OTEL_EXPORTER_OTLP_INSECURE", True)
+
+    provider = TracerProvider(
+        resource=Resource.create(
+            {
+                "service.name": service_name,
+                "service.version": "1.0.0",
+            }
+        )
+    )
+    trace.set_tracer_provider(provider)
+    provider.add_span_processor(
+        BatchSpanProcessor(
+            OTLPSpanExporter(
+                endpoint=endpoint,
+                insecure=insecure,
+            )
+        )
+    )
+
+    FastAPIInstrumentor.instrument_app(app)
+    LoggingInstrumentor().instrument(set_logging_format=False)
+    logger.info("Tracing enabled", extra={"otlp_endpoint": endpoint})
+
+
+def _setup_metrics() -> None:
+    if not ENABLE_METRICS:
+        logger.info("Metrics disabled via ENABLE_METRICS")
+        return
+    Instrumentator().instrument(app).expose(app, include_in_schema=False, endpoint="/metrics")
+    logger.info("Metrics endpoint enabled at /metrics")
+
 DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5-mini")  # או gpt-4.1-mini
 print("✅ DEFAULT_MODEL =", DEFAULT_MODEL)
 
 # --- הוספת CORS ---
-origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+origins = _env_csv(
+    "CORS_ALLOWED_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173",
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -42,11 +122,10 @@ app.add_middleware(
 )
 
 from agents import set_tracing_disabled
-set_tracing_disabled(True)
+set_tracing_disabled(_env_bool("AGENTS_TRACING_DISABLED", not ENABLE_TRACING))
 
-
-
-load_dotenv()
+_setup_tracing()
+_setup_metrics()
 
 # Use a cheaper model by default
 os.environ.setdefault("OPENAI_MODEL", "gpt-4o-mini")
@@ -117,6 +196,53 @@ async def run_with_tpm_fallback(agent: Agent, user_prompt: str, max_attempts: in
                 continue
             await asyncio.sleep(min(2 ** attempt, 10))
     raise RuntimeError("TPM fallback exhausted: still hitting rate limits after retries.")
+
+
+def _raise_http_for_openai_error(exc: Exception) -> None:
+    msg = str(exc)
+    msg_lower = msg.lower()
+
+    status_code = getattr(exc, "status_code", None)
+    provider_code = None
+    provider_msg = None
+
+    body = getattr(exc, "body", None)
+    if isinstance(body, dict):
+        err = body.get("error") if isinstance(body.get("error"), dict) else {}
+        provider_code = err.get("code")
+        provider_msg = err.get("message")
+
+    if isinstance(exc, AuthenticationError) or status_code == 401 or "invalid_api_key" in msg_lower or "incorrect api key" in msg_lower:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "code": "openai_auth_error",
+                "message": provider_msg or "OpenAI authentication failed. Check OPENAI_API_KEY.",
+                "provider_code": provider_code,
+            },
+        )
+
+    if isinstance(exc, RateLimitError) or status_code == 429 or "insufficient_quota" in msg_lower or "quota" in msg_lower or "rate limit" in msg_lower:
+        err_code = "openai_quota_exceeded" if (provider_code == "insufficient_quota" or "insufficient_quota" in msg_lower or "quota" in msg_lower) else "openai_rate_limit"
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": err_code,
+                "message": provider_msg or "OpenAI rate limit/quota exceeded. Check billing/quota and retry.",
+                "provider_code": provider_code,
+            },
+        )
+
+    if isinstance(exc, APIStatusError) and status_code is not None:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": "openai_api_error",
+                "message": provider_msg or msg,
+                "provider_status": status_code,
+                "provider_code": provider_code,
+            },
+        )
 
 
 # ---------------------------
@@ -582,7 +708,7 @@ async def _grab_frame_data_url() -> Optional[str]:
     try:
         result = await MCP_SERVER.call_tool(
             "browser_take_screenshot",
-            {"format": "jpeg", "quality": 70},
+            {"type": "jpeg"},
         )
     except Exception as e:
         print("[frames] browser_take_screenshot failed:", repr(e))
@@ -603,8 +729,9 @@ async def _grab_frame_data_url() -> Optional[str]:
         if data and mime:
             return f"data:{mime};base64,{data}"
 
-    # If we got here, response shape is unexpected
-    print("[frames] No image item in content. content types:", [type(x) for x in content])
+    # If we got here, response shape is unexpected (no ImageContent in result)
+    err_text = getattr(content[0], "text", "") if content else ""
+    print("[frames] No image in screenshot result:", err_text[:120])
     return None
 
 async def _frames_loop(s: Session):
@@ -667,6 +794,23 @@ async def frames_ws(ws: WebSocket, session_id: str):
 # Endpoints
 # ---------------------------
 
+@app.get("/healthz")
+async def healthz():
+    return {"status": "ok"}
+
+
+@app.get("/readyz")
+async def readyz():
+    if MCP_SERVER is None:
+        raise HTTPException(status_code=503, detail="MCP server not initialized")
+    if FAILURE_ANALYZER is None:
+        raise HTTPException(status_code=503, detail="Failure analyzer not initialized")
+    return {
+        "status": "ready",
+        "mcp_server": True,
+        "failure_analyzer": True,
+    }
+
 @app.post("/sessions", response_model=CreateSessionResponse)
 async def create_session(req: CreateSessionRequest):
     _assert_domain(req.start_url, req.allowed_domain)
@@ -693,7 +837,12 @@ async def create_session(req: CreateSessionRequest):
 
     async with s.lock:
         s.last_used_at = time.time()
-        run = await run_with_tpm_fallback(s.agent, _compose_prompt(s, init_prompt), max_attempts=4)
+        try:
+            run = await run_with_tpm_fallback(s.agent, _compose_prompt(s, init_prompt), max_attempts=4)
+        except Exception as e:
+            _raise_http_for_openai_error(e)
+            raise
+
         out = (run.final_output or "").strip()
         s.history.append(out[:1200])
         s.last_snapshot = _extract_state_block(out)
@@ -832,6 +981,7 @@ async def send_prompt(session_id: str, req: PromptRequest):
             )
 
         except Exception as e:
+            _raise_http_for_openai_error(e)
             err = {"type": type(e).__name__, "message": str(e)}
             
             # Analyze the exception as a failure

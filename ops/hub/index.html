@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>System Ops Hub</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b1020;
+        --card: #131a31;
+        --ok: #22c55e;
+        --warn: #f59e0b;
+        --bad: #ef4444;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+      }
+      body {
+        margin: 0;
+        font-family: Inter, Segoe UI, Arial, sans-serif;
+        background: radial-gradient(circle at 20% 0%, #1b254a 0%, var(--bg) 45%);
+        color: var(--text);
+      }
+      .wrap {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+      }
+      p.sub {
+        margin: 0 0 18px;
+        color: var(--muted);
+      }
+      .toolbar {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+      button {
+        background: #1e293b;
+        color: var(--text);
+        border: 1px solid #334155;
+        padding: 10px 14px;
+        border-radius: 10px;
+        cursor: pointer;
+      }
+      button:hover { border-color: #64748b; }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 12px;
+      }
+      .card {
+        background: linear-gradient(180deg, #151d38, var(--card));
+        border: 1px solid #263252;
+        border-radius: 14px;
+        padding: 14px;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+      }
+      .name { font-size: 16px; font-weight: 600; }
+      .pill {
+        font-size: 12px;
+        font-weight: 700;
+        padding: 4px 8px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+      }
+      .unknown { color: var(--muted); border-color: #475569; }
+      .ok { color: var(--ok); border-color: #166534; }
+      .bad { color: var(--bad); border-color: #7f1d1d; }
+      .url {
+        margin-top: 8px;
+        font-size: 12px;
+        color: var(--muted);
+        overflow-wrap: anywhere;
+      }
+      .actions { margin-top: 10px; display: flex; gap: 8px; }
+      a {
+        text-decoration: none;
+        color: #93c5fd;
+        font-size: 13px;
+      }
+      .footer {
+        margin-top: 16px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      code { color: #c4b5fd; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>System Ops Hub</h1>
+      <p class="sub">Single visual hub for app + observability components</p>
+
+      <div class="toolbar">
+        <button id="refresh">Refresh Status</button>
+      </div>
+
+      <div id="grid" class="grid"></div>
+      <div class="footer">
+        Hub URL: <code>http://localhost:7070</code>
+      </div>
+    </div>
+
+    <script>
+      const components = [
+        { name: "Frontend", health: "/api/frontend/health", open: "http://localhost:5173" },
+        { name: "MCP API", health: "/api/mcp/health", open: "http://localhost:8000" },
+        { name: "MCP API Ready", health: "/api/mcp/ready", open: "http://localhost:8000/readyz" },
+        { name: "Playwright MCP", health: "/api/playwright/health", open: "http://localhost:8931" },
+        { name: "Grafana", health: "/api/grafana/health", open: "http://localhost:3000" },
+        { name: "Prometheus", health: "/api/prometheus/health", open: "http://localhost:9090" },
+        { name: "Loki", health: "/api/loki/health", open: "http://localhost:3100" },
+        { name: "Tempo", health: "/api/tempo/health", open: "http://localhost:3200" },
+        { name: "cAdvisor", health: "/api/cadvisor/health", open: "http://localhost:8081" },
+        { name: "Node Exporter", health: "/api/nodeexporter/health", open: "http://localhost:9100/metrics" }
+      ];
+
+      const grid = document.getElementById("grid");
+
+      function createCard(c) {
+        const el = document.createElement("div");
+        el.className = "card";
+        el.innerHTML = `
+          <div class="row">
+            <div class="name">${c.name}</div>
+            <span class="pill unknown" id="pill-${c.name.replace(/\s+/g, "-")}">UNKNOWN</span>
+          </div>
+          <div class="url">Health: ${c.health}</div>
+          <div class="actions">
+            <a href="${c.open}" target="_blank" rel="noreferrer">Open component</a>
+          </div>
+        `;
+        return el;
+      }
+
+      async function ping(c) {
+        const id = `pill-${c.name.replace(/\s+/g, "-")}`;
+        const pill = document.getElementById(id);
+        try {
+          const res = await fetch(c.health, { cache: "no-store" });
+          if (res.ok) {
+            pill.textContent = `UP (${res.status})`;
+            pill.className = "pill ok";
+          } else {
+            pill.textContent = `DOWN (${res.status})`;
+            pill.className = "pill bad";
+          }
+        } catch (_) {
+          pill.textContent = "DOWN";
+          pill.className = "pill bad";
+        }
+      }
+
+      async function refreshAll() {
+        await Promise.all(components.map(ping));
+      }
+
+      components.forEach((c) => grid.appendChild(createCard(c)));
+      document.getElementById("refresh").addEventListener("click", refreshAll);
+      refreshAll();
+      setInterval(refreshAll, 10000);
+    </script>
+  </body>
+</html>
