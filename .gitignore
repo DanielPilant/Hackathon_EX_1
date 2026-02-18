@@ -7,4 +7,19 @@ __pycache__/
 *.py[cod]
 *$py.class
 venv/
+.venv/
 .env
+
+# Node
+node_modules/
+
+# macOS
+.DS_Store
+
+# IDE / build
+*.log
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+dist/
+build/
