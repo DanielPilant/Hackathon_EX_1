@@ -848,4 +848,5 @@ curl -s -X DELETE "http://localhost:8000/sessions/$SESSION"
 
 ---
 
-*Branch: `NewBackend` — Repository: [DanielPilant/Hackathon_EX_1](https://github.com/DanielPilant/Hackathon_EX_1)*
+*Branch: `main` — Repository: [DanielPilant/Hackathon_EX_1](https://github.com/DanielPilant/Hackathon_EX_1)*
+
