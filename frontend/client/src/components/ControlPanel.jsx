@@ -1,13 +1,12 @@
 import React, { useState } from "react";
 import {
   Globe,
-  CheckCircle,
   MessageSquare,
   Play,
-  Zap,
   Loader2,
   Command,
   Sparkles,
+  RotateCcw,
 } from "lucide-react";
 import clsx from "clsx";
 import { GlassCard } from "./ui/GlassCard";
@@ -29,7 +28,7 @@ const getDisplayHostname = (value) => {
 };
 
 const TargetSection = React.memo(
-  ({ targetUrl, setTargetUrl, isConnected, isScanning, onConnect }) => {
+  ({ targetUrl, setTargetUrl, isConnected, isScanning, onConnect, onReset }) => {
     return (
       <div className="space-y-3">
         <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
@@ -52,26 +51,32 @@ const TargetSection = React.memo(
             />
           </div>
 
-          <GlowButton
-            onClick={() => onConnect(targetUrl)}
-            disabled={isConnected || isScanning || !targetUrl}
-            className="min-w-[110px]"
-            variant={isConnected ? "success" : "primary"}
-          >
-            {isConnected ? (
-              <>
-                <CheckCircle className="w-4 h-4" />
-                <span>Linked</span>
-              </>
-            ) : isScanning ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Linking</span>
-              </>
-            ) : (
-              "Connect"
-            )}
-          </GlowButton>
+          {isConnected ? (
+            <GlowButton
+              onClick={onReset}
+              className="min-w-[110px]"
+              variant="danger"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>Reset</span>
+            </GlowButton>
+          ) : (
+            <GlowButton
+              onClick={() => onConnect(targetUrl)}
+              disabled={isScanning || !targetUrl}
+              className="min-w-[110px]"
+              variant="primary"
+            >
+              {isScanning ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Linking</span>
+                </>
+              ) : (
+                "Connect"
+              )}
+            </GlowButton>
+          )}
         </div>
 
         {isConnected && (
@@ -168,22 +173,28 @@ export const ControlPanel = ({
   isConnected,
   isScanning,
   isRunningTest,
-  isFullScanning,
   isSuggesting,
   onConnect,
   onRunTest,
-  onFullScan,
+  onReset,
   onGenerateSuggestion,
   className,
   sessionId,
   shouldTriggerScan,
   setShouldTriggerScan,
+  // controlled URL state (lifted to App so it survives layout transitions)
+  targetUrl,
+  onTargetUrlChange,
 }) => {
-  const [targetUrl, setTargetUrl] = useState("");
   const [userPrompt, setUserPrompt] = useState("");
 
   const handleRunTest = () => {
     onRunTest(userPrompt);
+  };
+
+  const handleReset = () => {
+    setUserPrompt("");
+    onReset(); // App clears targetUrl as part of resetSession
   };
 
   const handleDeepScanClick = () => {
@@ -205,10 +216,11 @@ export const ControlPanel = ({
 
       <TargetSection
         targetUrl={targetUrl}
-        setTargetUrl={setTargetUrl}
+        setTargetUrl={onTargetUrlChange}
         isConnected={isConnected}
         isScanning={isScanning}
         onConnect={onConnect}
+        onReset={handleReset}
       />
 
       <DirectiveSection

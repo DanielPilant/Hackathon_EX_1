@@ -1,10 +1,71 @@
 import { useEffect, useState } from "react";
-import { Monitor, Signal, WifiOff } from "lucide-react";
+import { Monitor, Signal, WifiOff, MousePointer, Eye } from "lucide-react";
 import { GlassCard } from "./ui/GlassCard";
 import clsx from "clsx";
 import { buildWsCandidates } from "../config";
 
-export const VideoPlayer = ({ sessionId }) => {
+// VITE_BROWSER_VIEW_MODE=novnc → Docker mode: embed real browser via noVNC iframe
+// VITE_BROWSER_VIEW_MODE=screenshots (default) → local mode: WebSocket screenshot stream
+const BROWSER_VIEW_MODE = import.meta.env.VITE_BROWSER_VIEW_MODE || "screenshots";
+const NOVNC_URL = import.meta.env.VITE_NOVNC_URL || "";
+
+// --- noVNC mode: embed the real Chromium window in an iframe ---
+const NoVncViewer = () => {
+  // Default: view-only. Toggle to allow mouse/keyboard input into the VNC session.
+  const [interactive, setInteractive] = useState(false);
+
+  // Changing the src reconnects the iframe with the correct viewOnly setting
+  const iframeSrc = interactive ? `${NOVNC_URL}?interactive=1` : NOVNC_URL;
+
+  return (
+    <GlassCard className="h-full p-0 flex flex-col overflow-hidden" delay={0.3}>
+      <div className="p-4 border-b border-white/5 flex items-center gap-3 bg-white/5 backdrop-blur-md">
+        <Monitor className="w-4 h-4 text-blue-400" />
+        <h2 className="text-sm font-bold text-white tracking-wide uppercase">
+          Visual Feed
+        </h2>
+        <div className="ml-auto flex items-center gap-2">
+          {/* Toggle view-only ↔ interactive */}
+          <button
+            onClick={() => setInteractive((v) => !v)}
+            title={interactive ? "Switch to view-only" : "Enable mouse & keyboard"}
+            className={clsx(
+              "p-1.5 rounded border transition-all duration-200",
+              interactive
+                ? "border-emerald-500/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
+                : "border-white/10 text-slate-500 hover:text-slate-300 hover:border-white/20"
+            )}
+          >
+            {interactive ? (
+              <Eye className="w-3.5 h-3.5" />
+            ) : (
+              <MousePointer className="w-3.5 h-3.5" />
+            )}
+          </button>
+
+          <div className="w-2 h-2 rounded-full bg-emerald-500 text-emerald-500 animate-pulse shadow-[0_0_8px_currentColor]" />
+          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400">
+            {interactive ? "Interactive" : "Live Browser"}
+          </span>
+        </div>
+      </div>
+
+      {/* Real Chromium window via noVNC — fills container, scales dynamically */}
+      <div className="flex-1 min-h-0 bg-black relative overflow-hidden">
+        <iframe
+          src={iframeSrc}
+          className="w-full h-full border-0"
+          title="Live Browser (noVNC)"
+        />
+        {/* Overlay blocks mouse/keyboard when view-only; removed when interactive */}
+        {!interactive && <div className="absolute inset-0 z-10" />}
+      </div>
+    </GlassCard>
+  );
+};
+
+// --- Screenshots mode: existing WebSocket screenshot stream (unchanged) ---
+const ScreenshotViewer = ({ sessionId }) => {
   const [src, setSrc] = useState("");
   const [connected, setConnected] = useState(false);
 
@@ -149,4 +210,9 @@ export const VideoPlayer = ({ sessionId }) => {
       </div>
     </GlassCard>
   );
+};
+
+export const VideoPlayer = ({ sessionId }) => {
+  if (BROWSER_VIEW_MODE === "novnc") return <NoVncViewer />;
+  return <ScreenshotViewer sessionId={sessionId} />;
 };

@@ -64,7 +64,16 @@ export const backend = {
     return backend.getManualSuggestions(sessionId);
   },
 
-  // 5. Log to Terminal
+  // 5. Reset browser to blank (called on frontend page load to give a clean slate)
+  resetBrowser: async () => {
+    try {
+      await axios.post(`${API_BASE_URL}/browser/reset`);
+    } catch (error) {
+      console.warn("Backend: browser reset failed (non-fatal):", error);
+    }
+  },
+
+  // 6. Log to Terminal
   logToTerminal: async (data) => {
     try {
       await axios.post(`${API_BASE_URL}/client-log`, { message: data });

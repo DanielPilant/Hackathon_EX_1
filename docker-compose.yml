@@ -12,6 +12,9 @@ services:
       VITE_WS_BASE_URL: ws://localhost:8000
       VITE_FRAMES_WS_BASE_URL: ws://localhost:8000
       CHOKIDAR_USEPOLLING: "true"
+      # Docker mode: show the real Chromium window via noVNC instead of WS screenshots
+      VITE_BROWSER_VIEW_MODE: novnc
+      VITE_NOVNC_URL: "http://localhost:6080/viewer.html"
     ports:
       - "5173:5173"
     volumes:
@@ -92,11 +95,10 @@ services:
       dockerfile: Backend/playwright-mcp/Dockerfile
     image: hackathon-playwright-mcp
     container_name: playwright-mcp
-    command: ["npx", "@playwright/mcp", "--host", "0.0.0.0", "--port", "8931",
-              "--headless", "--browser", "chromium", "--allowed-hosts", "*",
-              "--shared-browser-context", "--image-responses", "allow"]
+    # start.sh runs Xvfb + VNC + noVNC + Playwright MCP (headed, no --headless)
     ports:
       - "8931:8931"
+      - "6080:6080"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8931').then(()=>process.exit(0)).catch(()=>process.exit(1))"]
       interval: 10s

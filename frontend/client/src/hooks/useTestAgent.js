@@ -376,6 +376,13 @@ export const useTestAgent = () => {
     await backend.logToTerminal(data);
   };
 
+  const resetSession = () => {
+    setSessionId(null);
+    setIsConnected(false);
+    setTestHistory([]);
+    backend.resetBrowser();
+  };
+
   return {
     sessionId,
     userId,
@@ -393,5 +400,6 @@ export const useTestAgent = () => {
     logToTerminal,
     shouldTriggerScan,
     setShouldTriggerScan,
+    resetSession,
   };
 };

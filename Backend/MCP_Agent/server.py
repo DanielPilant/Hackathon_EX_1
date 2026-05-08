@@ -794,6 +794,18 @@ async def frames_ws(ws: WebSocket, session_id: str):
 # Endpoints
 # ---------------------------
 
+@app.post("/browser/reset")
+async def reset_browser():
+    """Navigate the shared browser to about:blank so a frontend page-refresh starts clean."""
+    if MCP_SERVER is None:
+        raise HTTPException(status_code=503, detail="MCP server not initialized")
+    try:
+        await MCP_SERVER.call_tool("browser_navigate", {"url": "about:blank"})
+    except Exception as e:
+        logger.warning("browser_reset: navigate failed (non-fatal): %s", e)
+    return {"ok": True}
+
+
 @app.get("/healthz")
 async def healthz():
     return {"status": "ok"}

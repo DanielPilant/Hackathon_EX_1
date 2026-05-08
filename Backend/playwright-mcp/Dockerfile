@@ -9,6 +9,11 @@ RUN apt-get update && apt-get install -y \
     libgtk-3-0 fonts-liberation \
     --no-install-recommends && rm -rf /var/lib/apt/lists/*
 
+# Docker mode: virtual display + VNC + noVNC so the browser window is viewable
+RUN apt-get update && apt-get install -y \
+    xvfb x11vnc novnc \
+    --no-install-recommends && rm -rf /var/lib/apt/lists/*
+
 # Install @playwright/mcp globally (this brings its own playwright dep)
 RUN npm install -g @playwright/mcp@latest
 
@@ -19,10 +24,14 @@ RUN PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     node "$(npm root -g)/@playwright/mcp/node_modules/playwright/cli.js" \
     install chromium --with-deps
 
+COPY Backend/playwright-mcp/start.sh /start.sh
+RUN chmod +x /start.sh
+
 EXPOSE 8931
+# noVNC web viewer
+EXPOSE 6080
 
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
-CMD ["npx", "@playwright/mcp", "--host", "0.0.0.0", "--port", "8931", \
-     "--headless", "--browser", "chromium", "--allowed-hosts", "*", \
-     "--shared-browser-context", "--image-responses", "allow"]
+# Starts Xvfb + VNC + noVNC + Playwright MCP (headed)
+CMD ["/start.sh"]
